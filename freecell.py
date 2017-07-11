@@ -7,6 +7,8 @@ def randomGenerator(seed=1):
     # state_n+1 = 214013 x stat_n + 2531011 (mod 2^31)
     # rand_n = state_n / 2^16
     # rand_n is in range 0 to 32767
+    max_int32 = (1 << 31) -1
+    seed = seed & max_int32
     while True:
         seed = (seed * 214013 + 2531011) & max_int32
         yield seed >> 16
@@ -37,8 +39,25 @@ def show(cards):
     for i in range(0, len(cards), 8):
         print " ", " ".join(l[i : i+8])
  
-if __name__ == '__main__':
-    seed = int(argv[1]) if len(argv) == 2 else 11982
-    print "Hand", seed
-    deck = deal(seed)
+def showHand(handNumber):
+    '''
+    >>> showHand(2647)
+    Hand 2647
+      KH 3S 7H 4C QD 5H TD 7S
+      7D 5C AD 3C AH AC 6D 8D
+      6C TH QS 2C KD 6H QH 7C
+      TC 6S JD KC 5D QC JC JS
+      2D 9S 3H 5S 3D 8H 9C 9D
+      JH 4H 4D TS 2S KS AS 9H
+      8S 2H 4S 8C
+    >>>
+    '''
+    print "Hand", handNumber
+    deck = deal(handNumber)
     show(deck)
+
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()
+    seed = int(argv[1]) if len(argv) == 2 else 11982
+    showHand(seed)
