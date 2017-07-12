@@ -49,7 +49,9 @@ def show(cards):
 
 def showUnicode(cards):
     #  Codepoints for playing cards: 1F0A4 is 4 of clubs
-    uCodePoints = [list(range(1,14))[c // 4] +  # this is value for Ace, 2, 3,..,King 
+    #  Note that for some odd reason, you have to skip 12 (0xC)
+    #  between Jack and Queen
+    uCodePoints = [[1,2,3,4,5,6,7,8,9,10,11,13,14][c // 4] +  # this is value for Ace, 2, 3,..,King 
              [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4] # clubs, diamonds, hearts, spades
              for c in cards]
     #  chr() converts a Unicode code point into a str character
