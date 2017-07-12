@@ -4,13 +4,17 @@ from sys import argv
  
 def randomGenerator(seed=1):
     # This is the linear congruential generator used in MS freecell
-    # state_n+1 = 214013 x stat_n + 2531011 (mod 2^31)
-    # rand_n = state_n / 2^16
-    # rand_n is in range 0 to 32767
+    #   state_n+1 = 214013 x state_n + 2531011 (mod 2^31)
+    #   rand_n = state_n / 2^16
+    #   rand_n is in range 0 to 32767
     max_int32 = (1 << 31) -1
+    #print('{0:0=32b}'.format(max_int32)) # debug
     seed = seed & max_int32
     while True:
+        #   calculate the next state (AND[&] max_int32 strips off high bit
+        #   and is equivalent to mod 2^31)
         seed = (seed * 214013 + 2531011) & max_int32
+	#   recall that 32 >> 4 == 32 / 2^4. So seed >> 16 == seed / 2^16
         yield seed >> 16
  
 def deal(seed):
@@ -27,17 +31,27 @@ def deal(seed):
     #      first 4 columns having 7 cards and the last 4 having 6
     #      cards.
     nc = 52
-    cards = range(nc - 1, -1, -1)
-    rnd = randomGenerator(seed)
+    cards = list(range(nc - 1, -1, -1)) # [51-0] - note that last card is first here
+    rnd = randomGenerator(seed) # rnd is a generator function
     for i, r in zip(range(nc), rnd):
-        j = (nc - 1) - r % (nc - i)
+        j = (nc - 1) - (r % (nc - i))
         cards[i], cards[j] = cards[j], cards[i]
+    #  since this is done "backwards" relative to the description above,
+    #  the first card to be dealt will be in the 0th array spot rather
+    #  than the last array spot as in the description above.
+    #print('deal: exiting: cards={}'.format(cards))
     return cards
  
 def show(cards):
-    l = ["A23456789TJQK"[c / 4] + "CDHS"[c % 4] for c in cards]
+    l = ["A23456789TJQK"[c // 4] + "CDHS"[c % 4] for c in cards]
     for i in range(0, len(cards), 8):
-        print " ", " ".join(l[i : i+8])
+        print(" ", " ".join(l[i : i+8]))
+
+def showUnicode(cards):
+    l = [str(list(range(1,14))[c // 4] + [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4]) for c in cards]
+    for i in range(0, len(cards), 8):
+        print(" ", " ".join(l[i : i+8]))
+        print(" ", "{0:x}".format(" ".join(l[i : i+8])))
  
 def showHand(handNumber):
     '''
@@ -52,7 +66,7 @@ def showHand(handNumber):
       8S 2H 4S 8C
     >>>
     '''
-    print "Hand", handNumber
+    print("Hand {}".format(handNumber))
     deck = deal(handNumber)
     show(deck)
 
@@ -61,3 +75,4 @@ if __name__ == '__main__':
     doctest.testmod()
     seed = int(argv[1]) if len(argv) == 2 else 11982
     showHand(seed)
+    showUnicode(deal(seed))
