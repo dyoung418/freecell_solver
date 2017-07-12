@@ -1,0 +1,6 @@
+u = chr(int('1F0A4', 16)).encode('utf-8')
+xu = chr(int('1F0A4', 16))
+xxu = chr(0x1F0A4)
+print(u)
+print(xu)
+print(xxu)

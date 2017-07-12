@@ -48,10 +48,17 @@ def show(cards):
         print(" ", " ".join(l[i : i+8]))
 
 def showUnicode(cards):
-    l = [str(list(range(1,14))[c // 4] + [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4]) for c in cards]
+    #  Codepoints for playing cards: 1F0A4 is 4 of clubs
+    uCodePoints = [list(range(1,14))[c // 4] +  # this is value for Ace, 2, 3,..,King 
+             [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4] # clubs, diamonds, hearts, spades
+             for c in cards]
+    #  chr() converts a Unicode code point into a str character
+    #  note that a unicode code point is *not* the same as utf-8
+    #  Utf-8 forces codepoints > 128 to be multi-byte values where
+    #  each byte is non-zero and in range 128 to 255.
+    uString = [chr(c) for c in uCodePoints]
     for i in range(0, len(cards), 8):
-        print(" ", " ".join(l[i : i+8]))
-        print(" ", "{0:x}".format(" ".join(l[i : i+8])))
+        print(" ", " ".join(uString[i : i+8]))
  
 def showHand(handNumber):
     '''
