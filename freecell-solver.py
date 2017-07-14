@@ -5,7 +5,7 @@ import search, freecell, random
 ranks = ['1','2','3','4','5','6','7','8','9','T','J','Q','K']
 suits = ['H','C','D','S']
 
-class FState(object):
+class freecellState(object):
 	def __init__(self, tableau=None, dealSeed=None, 
 				stacks=None, bays=None, bayMax=4):
 		if tableau:
@@ -49,6 +49,10 @@ class Freecell(search.Problem):
 	"""docstring for Freecell"""
 	def __init__(self, initial, goal=None):
 		super(Freecell, self).__init__()
+		# DAY TODO: check type of initial and if it isn't
+		# a FreecellState object, error.  if it is, then it is OK.
+		# if 'initial' is None, we need to instantiate a freecellState
+		# object
 		if not goal:
 			self.goal == freecellGoal
 
