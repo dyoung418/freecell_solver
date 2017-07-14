@@ -1,4 +1,4 @@
-import search, freecell
+import search, freecell, random
 
 #######################################################################
 # Representing state in freecell:
@@ -6,24 +6,20 @@ ranks = ['1','2','3','4','5','6','7','8','9','T','J','Q','K']
 suits = ['H','C','D','S']
 
 class FState(object):
-	def __init__(self, tableau=None, stacks=None, bays=None, bayMax=4):
+	def __init__(self, tableau=None, dealSeed=None, 
+				stacks=None, bays=None, bayMax=4):
 		if tableau:
 			self.tableau = tableau
-			self.leaves = self.updateLeaves()
 		else:
-
-			# DAY TODO: change this so that each internal list of the 
-			#  list of lists is the *column* of the deal rather than
-			#  the row of the deal.  That way, it is easy to look at
-			#  each column. 
-			#  Also, make it so these go up and down in length rathern
-			#  than stay constant length. (but number of columns will
-			#   be constant.)
-			self.tableau = [[None for r in range(8)] for c in range(6)]
-			self.tableau.append([None for r in range(4)])
-			#tableau = [[r+(c*8) for r in range(8)] for c in range(6)]
-			#tableau.append([r+48 for r in range(4)])	
-			self.leaves = []		
+			# Note: tableau is a list of lists.  The inner lists are the
+			# *columns*, not the rows.  That makes it easier to see the
+			# leaf cards.
+			self.tableau = [[] for c in range(8)]
+			if not dealSeed:
+				dealSeed = random.randrange(1, 32000) # MS deals from 0 to 32k
+			randomDeal = freecell.msFreecellDeal(dealSeed)
+			for i, card in enumerate(randomDeal):
+				self.tableau[i%8].append(freecell.msCardNumToString(card))
 		if stacks:
 			self.stacks = stacks
 		else:
@@ -37,10 +33,6 @@ class FState(object):
 			self.bays = [] 
 		self.bayMax = bayMax
 
-	def updateLeaves(self):
-		'''Returns the bottom card of each column in list of 
-		(col#, card) tuples'''
-		result = []
 
 
 freecellGoal = Fstate(stacks= {

@@ -2,7 +2,7 @@
 
 from sys import argv
  
-def randomGenerator(seed=1):
+def msRandomGenerator(seed=1):
     # This is the linear congruential generator used in MS freecell
     #   state_n+1 = 214013 x state_n + 2531011 (mod 2^31)
     #   rand_n = state_n / 2^16
@@ -17,7 +17,7 @@ def randomGenerator(seed=1):
 	#   recall that 32 >> 4 == 32 / 2^4. So seed >> 16 == seed / 2^16
         yield seed >> 16
  
-def deal(seed):
+def msFreecellDeal(seed):
     # 1. Seed the RNG with the number of the deal
     # 2. Create an array of cards, AC, AD, AH, AS, 2C, 2D, 2H, 2S, etc.
     #    with array indexes of 0 to 51
@@ -32,7 +32,7 @@ def deal(seed):
     #      cards.
     nc = 52
     cards = list(range(nc - 1, -1, -1)) # [51-0] - note that last card is first here
-    rnd = randomGenerator(seed) # rnd is a generator function
+    rnd = msRandomGenerator(seed) # rnd is a generator function
     for i, r in zip(range(nc), rnd):
         j = (nc - 1) - (r % (nc - i))
         cards[i], cards[j] = cards[j], cards[i]
@@ -40,7 +40,16 @@ def deal(seed):
     #  the first card to be dealt will be in the 0th array spot rather
     #  than the last array spot as in the description above.
     #print('deal: exiting: cards={}'.format(cards))
+    # Note that this return value is a flat vector of the cards
+    # that would be dealt out to the tableau *row by row* where
+    # each row is 8 cards (except the last row which is 4 cards)
     return cards
+
+def msCardNumToString(cardNum):
+    # cardNum is an int between 0-51.  Convert this 
+    # to a string representation of the card (e.g. QH for
+    # Queen of Hearts)
+    return "A23456789TJQK"[cardNum // 4] + "CDHS"[cardNum % 4]
  
 def show(cards):
     l = ["A23456789TJQK"[c // 4] + "CDHS"[c % 4] for c in cards]
@@ -76,7 +85,7 @@ def showHand(handNumber):
     >>>
     '''
     print("Hand {}".format(handNumber))
-    deck = deal(handNumber)
+    deck = msFreecellDeal(handNumber)
     show(deck)
 
 if __name__ == '__main__':
@@ -84,4 +93,4 @@ if __name__ == '__main__':
     doctest.testmod()
     seed = int(argv[1]) if len(argv) == 2 else 11982
     showHand(seed)
-    showUnicode(deal(seed))
+    showUnicode(msFreecellDeal(seed))
