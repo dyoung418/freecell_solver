@@ -45,29 +45,40 @@ def msFreecellDeal(seed):
     # each row is 8 cards (except the last row which is 4 cards)
     return cards
 
-def msCardNumToString(cardNum):
+def msCardNumToString(cardNum, ranks="A23456789TJQK", suits="CDHS"):
     # cardNum is an int between 0-51.  Convert this 
     # to a string representation of the card (e.g. QH for
     # Queen of Hearts)
-    return "A23456789TJQK"[cardNum // 4] + "CDHS"[cardNum % 4]
+    return ranks[cardNum // 4] + suits[cardNum % 4]
  
 def show(cards):
     l = ["A23456789TJQK"[c // 4] + "CDHS"[c % 4] for c in cards]
     for i in range(0, len(cards), 8):
         print(" ", " ".join(l[i : i+8]))
 
-def showUnicode(cards):
+def showUnicode(cards, fullCard=False):
     #  Codepoints for playing cards: 1F0A4 is 4 of clubs
     #  Note that for some odd reason, you have to skip 12 (0xC)
     #  between Jack and Queen
-    uCodePoints = [[1,2,3,4,5,6,7,8,9,10,11,13,14][c // 4] +  # this is value for Ace, 2, 3,..,King 
-             [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4] # clubs, diamonds, hearts, spades
-             for c in cards]
+    #uCodePoints = [[1,2,3,4,5,6,7,8,9,10,11,13,14][c // 4] +  # this is value for Ace, 2, 3,..,King 
+    #         [0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0][c % 4] # clubs, diamonds, hearts, spades
+    #         for c in cards]
+    if fullCard:
+        uCodePoints = [msCardNumToString(c, 
+                                     ranks=[1,2,3,4,5,6,7,8,9,10,11,13,14], # note the skipping 12 (see unicode)
+                                     suits=[0x1F0A0, 0x1F0C0, 0x1F0B0, 0x1F0D0]) #club, diamond, heart, spades
+                        for c in cards]
+        uString = [chr(c) for c in uCodePoints]
+    else:
+        uString = [msCardNumToString(c,
+                                 ranks=['A','2','3','4','5','6','7','8','9','T','J','Q','K'],
+                                 #suits=['\u2663', '\u2662', '\u2661', '\u2660']) #white/black but mismatched sizes
+                                 suits=['\u2667', '\u2662', '\u2661', '\u2664']) #all white but matched size
+                   for c in cards]
     #  chr() converts a Unicode code point into a str character
     #  note that a unicode code point is *not* the same as utf-8
     #  Utf-8 forces codepoints > 128 to be multi-byte values where
     #  each byte is non-zero and in range 128 to 255.
-    uString = [chr(c) for c in uCodePoints]
     for i in range(0, len(cards), 8):
         print(" ", " ".join(uString[i : i+8]))
  
