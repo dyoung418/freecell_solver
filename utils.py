@@ -13,15 +13,15 @@ import operator, math, random, copy, sys, os.path, bisect
 # 3 years old). The first part of this file brings you up to 2.4
 # compatibility if you are running in Python 2.2 or 2.3:
 
-try: bool, True, False ## Introduced in 2.3
-except NameError:
-    class bool(int):
-        "Simple implementation of Booleans, as in PEP 285"
-        def __init__(self, val): self.val = val
-        def __int__(self): return self.val
-        def __repr__(self): return ('False', 'True')[self.val]
-
-    True, False = bool(1), bool(0)
+#try: bool, True, False ## Introduced in 2.3
+#except NameError:
+#    class bool(int):
+#        "Simple implementation of Booleans, as in PEP 285"
+#        def __init__(self, val): self.val = val
+#        def __int__(self): return self.val
+#        def __repr__(self): return ('False', 'True')[self.val]
+#
+#    True, False = bool(1), bool(0)
 
 try: sum ## Introduced in 2.3
 except NameError:
@@ -531,12 +531,16 @@ def turn_right(orientation):
 def turn_left(orientation):
     return orientations[(orientations.index(orientation)+1) % len(orientations)]
 
-def distance((ax, ay), (bx, by)):
+def distance(a, b):
     "The distance between two (x, y) points."
+    ax, ay = x
+    bx, by = b
     return math.hypot((ax - bx), (ay - by))
 
-def distance2((ax, ay), (bx, by)):
+def distance2(a, b):
     "The square of the distance between two (x, y) points."
+    ax, ay = x
+    bx, by = b
     return (ax - bx)**2 + (ay - by)**2
 
 def clip(vector, lowest, highest):
@@ -632,8 +636,8 @@ def print_table(table, header=None, sep=' ', numfmt='%g'):
     sizes = map(maxlen, zip(*[map(str, row) for row in table]))
     for row in table:
         for (j, size, x) in zip(justs, sizes, row):
-            print getattr(str(x), j)(size), sep,
-        print
+            print(getattr(str(x), j)(size), sep,)
+        print()
 
 def AIMAFile(components, mode='r'):
     "Open a file based at the AIMA root directory."

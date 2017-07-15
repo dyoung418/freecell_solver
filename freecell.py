@@ -72,8 +72,8 @@ def showUnicode(cards, fullCard=False):
     else:
         uString = [msCardNumToString(c,
                                  ranks=['A','2','3','4','5','6','7','8','9','T','J','Q','K'],
-                                 #suits=['\u2663', '\u2662', '\u2661', '\u2660']) #white/black but mismatched sizes
-                                 suits=['\u2667', '\u2662', '\u2661', '\u2664']) #all white but matched size
+                                 suits=['\u2663', '\u2662', '\u2661', '\u2660']) #white/black but mismatched sizes
+                                 #suits=['\u2667', '\u2662', '\u2661', '\u2664']) #all white but matched size
                    for c in cards]
     #  chr() converts a Unicode code point into a str character
     #  note that a unicode code point is *not* the same as utf-8

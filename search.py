@@ -417,7 +417,8 @@ class Graph:
 
     def make_undirected(self):
         "Make a digraph into an undirected graph by adding symmetric edges."
-        for a in self.dict.keys():
+        #for a in self.dict.keys():
+        for a in list(self.dict):
             for (b, distance) in self.dict[a].items():
                 self.connect1(b, a, distance)
 
@@ -604,10 +605,10 @@ def print_boggle(board):
     "Print the board in a 2-d array."
     n2 = len(board); n = exact_sqrt(n2)
     for i in range(n2):
-        if i % n == 0 and i > 0: print
-        if board[i] == 'Q': print 'Qu',
-        else: print str(board[i]) + ' ',
-    print
+        if i % n == 0 and i > 0: print()
+        if board[i] == 'Q': print('Qu'),
+        else: print(str(board[i]) + ' '),
+    print()
 
 def boggle_neighbors(n2, cache={}):
     """Return a list of lists, where the i-th element is the list of indexes
@@ -748,7 +749,7 @@ def boggle_hill_climbing(board=None, ntimes=100, verbose=True):
         new = len(finder.set_board(board))
         if new > best:
             best = new
-            if verbose: print best, _, board
+            if verbose: print(best, _, board)
         else:
             board[i] = oldc ## Change back
     if verbose:
