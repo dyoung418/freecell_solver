@@ -1,5 +1,4 @@
-import search, freecell, random, math, collections, copy
-from sys import argv
+import search, freecell, random, math, collections, copy, sys, io
 
 #######################################################################
 # Representing state in freecell:
@@ -31,7 +30,8 @@ class Location(object):
         else:
             self.area = state.tableau
     def getCard(self):
-        if len(self.area) == 0:
+        #print('debug: Location.getCard(): areaCode={}, index={}'.format(self.areaCode, self.index))
+        if len(self.area[self.index]) == 0:
             return None
         else:
             return self.area[self.index][-1]
@@ -43,7 +43,8 @@ class Location(object):
 class FreecellState(object):
     def __init__(self, tableau=None, dealSeed=None, 
                 stacks=None, bays=None, bayMax=4):
-        print('debug: FreecellState.__init__: dealSeed={}, tableau={}'.format(dealSeed,tableau))
+        #print('debug: FreecellState.__init__: dealSeed={}, tableau={}'.format(dealSeed,tableau))
+        self.dealSeed = dealSeed
         if tableau:
             self.tableau = copy.deepcopy(tableau)
         else:
@@ -51,7 +52,6 @@ class FreecellState(object):
             # *columns*, not the rows.  That makes it easier to see the
             # leaf cards.
             self.tableau = [[] for c in range(tableauCols)]
-            self.dealSeed = dealSeed
             if dealSeed:
                 randomDeal = freecell.msFreecellDeal(dealSeed)
                 for i, card in enumerate(randomDeal):
@@ -68,52 +68,49 @@ class FreecellState(object):
             self.bays = copy.deepcopy(bays)
         else:
             self.bays = [[] for b in range(self.bayMax)] 
-        print('before error: self.tableau={}'.format(self.tableau))
-        self.printState()
         #print(''.join([str(Location(self, BAY, b)) for b in range(self.bayMax)])) #debug
         bayLocations = [Location(self, BAY, b) for b in range(self.bayMax)]
         stackLocations = [Location(self, STACK, s) for s in suits]
         tableauLocations = [Location(self, TABLEAU, t) for t in range(tableauCols)]
-        print(bayLocations)
-        print(stackLocations)
-        print(tableauLocations)
         self.everyLocation = copy.deepcopy(bayLocations)
-        self.everyLocation += stackLocations
-        self.everyLocation += tableauLocations
+        self.everyLocation += copy.deepcopy(stackLocations)
+        self.everyLocation += copy.deepcopy(tableauLocations)
         # self.everyLocation = [Location(self, BAY, b) for b in range(self.bayMax)].extend(
         #                        [Location(self, STACK, s) for s in suits].extend(
         #                          [Location(self, TABLEAU, t) for t in range(tableauCols)]
         #                          ))
 
-    def printState(self, unicode=True):
+    def printState(self, unicode=True, file=sys.stdout):
         if unicode:
             empty = '\N{WHITE VERTICAL RECTANGLE}'
         else:
             empty = '_'
         space = '  '
+        if self.dealSeed:
+            print('Deal number {}:'.format(self.dealSeed), file=file)
         # Bays 
         for b in range(self.bayMax):
             if len(self.bays[b]) > 0:
-                print(self.printableCard(self.bays[b][0], unicode) + space*2, end='')
+                print(self.printableCard(self.bays[b][0], unicode) + space*2, end='', file=file)
             else:
-                print(empty + space*2, end='')
-        print('   ', end='') # space between bays and stacks
+                print(empty + space*2, end='', file=file)
+        print('   ', end='', file=file) # space between bays and stacks
         # Stacks
         for stack in self.stacks:
             if len(self.stacks[stack]) > 0:
-                print(self.printableCard(self.stacks[stack][-1], unicode) + space*2, end='')
+                print(self.printableCard(self.stacks[stack][-1], unicode) + space*2, end='', file=file)
             else:
-                print(empty + space*2, end='')
-        print(''); print('')
+                print(empty + space*2, end='', file=file)
+        print('', file=file); print('', file=file)
         # Tableau
         for row in range(tableauRows):
             for col in range(tableauCols):
                 if len(self.tableau[col]) == 0:
-                    print(empty + space, end='')
+                    print(empty + space, end='', file=file)
                 if row < len(self.tableau[col]):
-                    print(self.printableCard(self.tableau[col][row], unicode) + space, end='')
-            print('')
-        print('')
+                    print(self.printableCard(self.tableau[col][row], unicode) + space, end='', file=file)
+            print('', file=file)
+        print('', file=file)
 
     def printableCard(self, card, unicode=True):
         if unicode:
@@ -122,15 +119,17 @@ class FreecellState(object):
             printSuits = {'H':'H', 'C':'C', 'D':'D', 'S':'S'}
         return card[RANK] + printSuits[card[SUIT]]
 
+    def __str__(self):
+        stringOutput = io.StringIO()
+        self.printState(file=stringOutput)
+        return stringOutput.getvalue()
+
     def takeAction(self, action):
-        origin = action[originLoc]
+        origin = action.originLoc
         card = origin.area[origin.index].pop()
         #assert card = action[originCard]
-        destination = action[destLoc]
+        destination = action.destLoc
         destination.area[destination.index].append(card)
-
-
-
 
 
 freecellGoal = FreecellState(stacks= {
@@ -169,10 +168,11 @@ class Freecell(search.Problem):
             if card:
                 for otherLoc in state.everyLocation:
                     if loc != otherLoc:
-                        if _validSpot(otherLoc, card):
+                        if self._validSpot(otherLoc, card):
                             result.append(Action(loc, card, otherLoc, otherLoc.getCard()))
+        return result
 
-    def _validSpot(location, card):
+    def _validSpot(self, location, card):
         '''return True or False depending on whether location is
         a valid spot for card.
         location = one of (BAY, index), (TABLEAU, index), (STACK, index)'''
@@ -195,7 +195,7 @@ class Freecell(search.Problem):
             else:
                 return False
         elif location.areaCode == TABLEAU:
-            if (card[SUIT] in validTableauNeighborSuit[cardSuit]) and (ranks.find(location.area[location.index][-1][RANK]) > ranks.find(card[RANK])):
+            if (card[SUIT] in validTableauNeighborSuit[card[SUIT]]) and (ranks.find(location.area[location.index][-1][RANK]) > ranks.find(card[RANK])):
                 return True
             else:
                 return False
@@ -205,7 +205,7 @@ class Freecell(search.Problem):
         action in the given state. The action must be one of
         self.actions(state)."""
         newState = FreecellState(tableau=state.tableau, stacks=state.stacks,
-                                bay=state.bay, bayMax=state.bayMax, dealSeed=None)
+                                bays=state.bays, bayMax=state.bayMax, dealSeed=None)
         newState.takeAction(action)
         return newState
 
@@ -220,14 +220,14 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
     # Very hard seed is 11982
-    seed = int(argv[1]) if len(argv) == 2 else random.randrange(1, 32000) # MS deals from 0 to 32k
+    seed = int(sys.argv[1]) if len(sys.argv) == 2 else random.randrange(1, 32000) # MS deals from 0 to 32k
     problem = Freecell(None, seed=seed)
     problem.initial.printState()
     problem.initial.printState(unicode=False)
 
 
     solution = search.tree_search(problem, [])
-    print(solution)
+    print('Solution path is: {}'.format(solution.path()))
 
 
 

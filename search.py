@@ -72,7 +72,7 @@ class Node(object):
             self.depth = parent.depth + 1
 
     def __repr__(self):
-        return "<Node %s>" % (self.state,)
+        return "<Node {}>".format(self.state)
 
     def expand(self, problem):
         "List the nodes reachable in one step from this node."
