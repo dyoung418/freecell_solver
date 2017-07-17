@@ -15,6 +15,15 @@ TABLEAU = 100
 BAY = 101
 STACK = 102
 
+# day TODO:
+# I saw a site that uses a very simple 2 character short name for actions:
+# the tableau columns are numbered 1-8, the bays are numbered a,b,c,d and the
+# stacks are just referred to has 'h'.  Then '2a' means move the card on the 
+# 2nd tableau column to the 'a' bay.  '38' means moves the card from the 3rd
+# tableau column to the 8th tableau column.  '7h' or 'bh' means move the card
+# from the 7th tableau column (or the 'b' bay) to the home stack (it doesn't
+# specify which one).
+# implement this.
 Action = collections.namedtuple('Action', ['originLoc', 'originCard', 'destLoc', 'destCard'])
 
 
