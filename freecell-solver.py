@@ -12,22 +12,10 @@ validTableauNeighborSuit = {'H':['C','S'], 'C':['H','D'],
 RANK = 0
 SUIT = 1
 
-# day TODO:
-# I saw a site that uses a very simple 2 character short name for actions:
-# the tableau columns are numbered 1-8, the bays are numbered a,b,c,d and the
-# stacks are just referred to has 'h'.  Then '2a' means move the card on the 
-# 2nd tableau column to the 'a' bay.  '38' means moves the card from the 3rd
-# tableau column to the 8th tableau column.  '7h' or 'bh' means move the card
-# from the 7th tableau column (or the 'b' bay) to the home stack (it doesn't
-# specify which one).
-# implement this.
-
 # Actions
 # t3:s2 means 'tableau column 3 to stack 2'
 # b1:t4 means 'bay one to tableau column 4'
 #
-
-
 
 
 class FreecellState(object):
@@ -56,7 +44,6 @@ class FreecellState(object):
             self.bays = copy.deepcopy(bays)
         else:
             self.bays = [[] for b in range(self.bayMax)] 
-        #print(''.join([str(Location(self, BAY, b)) for b in range(self.bayMax)])) #debug
         self.everyLocation = ['b'+str(b) for b in range(self.bayMax)] # Bays
         self.everyLocation += ['s'+str(s) for s in range(len(suits))] # Stacks
         self.everyLocation += ['t'+str(t) for t in range(tableauCols)] # Tableaus
@@ -153,10 +140,6 @@ class Freecell(search.Problem):
     """docstring for Freecell"""
     def __init__(self, initial, goal=None, seed=1):
         super(Freecell, self).__init__(initial, goal)
-        # DAY TODO: check type of initial and if it isn't
-        # a FreecellState object, error.  if it is, then it is OK.
-        # if 'initial' is None, we need to instantiate a freecellState
-        # object
         if not self.initial:
             self.initial = FreecellState(dealSeed=seed)
         if not isinstance(self.initial, FreecellState):
@@ -235,11 +218,10 @@ if __name__ == '__main__':
     seed = int(sys.argv[1]) if len(sys.argv) == 2 else random.randrange(1, 32000) # MS deals from 0 to 32k
     
     seed = 1066
-    # DAY TODO: on this deal (1066), it doesn't pick up the possible action of 't0:t1' which is a QC
-    # on top of a KD
     problem = Freecell(None, seed=seed)
     problem.initial.printState()
     problem.initial.printState(unicode=False)
+    print('Actions on this problem: {}'.format(problem.actions(problem.initial)))
     print('Actions on this problem: {}'.format(problem.actions(problem.initial)))
 
     if False:
