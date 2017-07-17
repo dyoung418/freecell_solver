@@ -200,12 +200,14 @@ class Freecell(search.Problem):
         elif areaCode == 'b':
             return False # non-empty bay is an invalid spot to move card
         elif areaCode == 's':
-            if (card[SUIT]==state.getStackSuits()[index]) and (ranks.find(area[index][-1][RANK]) == (ranks.find(card[RANK])-1)):
+            if (card[SUIT]==state.getStackSuits()[index]) and \
+               (ranks.index(area[index][-1][RANK]) == (ranks.index(card[RANK])-1)):
                 return True
             else:
                 return False
         elif areaCode == 't':
-            if (card[SUIT] in validTableauNeighborSuit[card[SUIT]]) and (ranks.find(area[index][-1][RANK]) > ranks.find(card[RANK])):
+            if (card[SUIT] in validTableauNeighborSuit[area[index][-1][SUIT]]) and \
+               (ranks.index(area[index][-1][RANK]) == ranks.index(card[RANK])+1):
                 return True
             else:
                 return False

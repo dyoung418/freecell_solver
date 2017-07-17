@@ -13,3 +13,6 @@ print('\u2664')
 print('\u2665')
 print('\u2666')
 print('\u2667')
+
+print('character names:')
+print('\N{WHITE CLUB SUIT}')
