@@ -693,6 +693,11 @@ class FIFOQueue(Queue):
             self.A = self.A[self.start:]
             self.start = 0
         return e
+    def __iter__(self):
+        '''needs to return an object which implements __next__() correctly
+        The self.A list does this, so update it and return that'''
+        self.A = self.A[self.start:]
+        return self.A
 
 class PriorityQueue(Queue):
     """A queue in which the minimum (or maximum) element (as determined by f and
@@ -709,6 +714,10 @@ class PriorityQueue(Queue):
             return self.A.pop(0)[1]
         else:
             return self.A.pop()[1]
+    def __iter__(self):
+        '''needs to return an object which implements __next__() correctly
+        The self.A list does this, so update it and return that'''
+        return self.A
 
 ## Fig: The idea is we can define things like Fig[3,10] later.
 ## Alas, it is Fig[3,10] not Fig[3.10], because that would be the same as Fig[3.1]

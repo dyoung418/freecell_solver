@@ -145,7 +145,9 @@ def tree_search(problem, frontier):
     Don't worry about repeated paths to a state. [Fig. 3.7]"""
     frontier.append(Node(problem.initial))
     while frontier:
+        #print('while frontier: {}'.format(frontier)) # debug
         node = frontier.pop()
+        #print('        examining node: {}'.format(node.solution())) # debug
         if problem.goal_test(node.state):
             return node
         frontier.extend(node.expand(problem))
@@ -159,6 +161,8 @@ def graph_search(problem, frontier):
     explored = set()
     while frontier:
         node = frontier.pop()
+        if len(node.solution()) > 0:
+            print('        examining node: {}\n{}'.format(node.solution()[-1], str(node.state))) # debug
         if problem.goal_test(node.state):
             return node
         explored.add(node.state)
@@ -205,7 +209,7 @@ def best_first_graph_search(problem, f):
     There is a subtlety: the line "f = memoize(f, 'f')" means that the f
     values will be cached on the nodes as they are computed. So after doing
     a best first search you can examine the f values of the path returned."""
-    f = memoize(f, 'f')
+    f = utils.memoize(f, 'f')
     node = Node(problem.initial)
     if problem.goal_test(node.state):
         return node
