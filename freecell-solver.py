@@ -50,9 +50,10 @@ class FreecellState(object):
 
     def printState(self, unicode=True, file=sys.stdout):
         if unicode:
-            empty = '\N{WHITE VERTICAL RECTANGLE}'
+            empty = '\N{WHITE VERTICAL RECTANGLE} '
         else:
-            empty = '_'
+            empty = '__'
+        tableauEmpty = '  '
         space = '  '
         if self.dealSeed:
             print('Deal number {}:'.format(self.dealSeed), file=file)
@@ -71,12 +72,16 @@ class FreecellState(object):
                 print(empty + space*2, end='', file=file)
         print('', file=file); print('', file=file)
         # Tableau
-        for row in range(tableauRows):
+        for row in range(tableauRows+len(ranks)): # a column could grow beyond tableauRows by len(ranks) cards
+            emptyCols = 0 # counter to see when all cols are run out of cards
             for col in range(tableauCols):
-                if len(self.tableau[col]) == 0:
-                    print(empty + space, end='', file=file)
                 if row < len(self.tableau[col]):
                     print(self.printableCard(self.tableau[col][row], unicode) + space, end='', file=file)
+                else:
+                    emptyCols += 1
+                    print(tableauEmpty + space, end='', file=file)
+            if emptyCols == tableauCols:
+                break
             print('', file=file)
         print('', file=file)
 
@@ -93,12 +98,21 @@ class FreecellState(object):
         return stringOutput.getvalue()
 
     def takeAction(self, action):
+        '''Modify this state object with the results of taking the 
+        input 'action'.'''
+        #TODO, I'd like to be able to check the validity of this action,
+        # but _validAction is in the Problem object.  Should it be here?
         origin, destination = action.split(sep=':', maxsplit=1)
-        origin = action.originLoc
-        card = origin.area[origin.index].pop()
+        origin_areaCode, origin_index = tuple(origin)
+        origin_index = int(origin_index)
+        card = self.getArea(origin)[origin_index].pop()
+        #card = origin.area[origin.index].pop()
         #assert card = action[originCard]
-        destination = action.destLoc
-        destination.area[destination.index].append(card)
+        dest_areaCode, dest_index = tuple(destination)
+        dest_index = int(dest_index)
+        self.getArea(destination)[dest_index].append(card)
+        #destination = action.destLoc
+        #destination.area[destination.index].append(card)
 
     def getCard(self, location):
         #print('debug: Location.getCard(): areaCode={}, index={}'.format(self.areaCode, self.index))
@@ -217,12 +231,17 @@ if __name__ == '__main__':
     # Very hard seed is 11982
     seed = int(sys.argv[1]) if len(sys.argv) == 2 else random.randrange(1, 32000) # MS deals from 0 to 32k
     
-    seed = 1066
+    seed = 2659
     problem = Freecell(None, seed=seed)
+    state = problem.initial
     problem.initial.printState()
     problem.initial.printState(unicode=False)
-    print('Actions on this problem: {}'.format(problem.actions(problem.initial)))
-    print('Actions on this problem: {}'.format(problem.actions(problem.initial)))
+    print('Actions on this problem: {}'.format(problem.actions(state)))
+    for action in ['t0:s0', 't5:s1', 't6:b0', 't7:t6', 't2:t7', 't3:b1', 't3:b2', 't3:b3']:
+        print('Action: {}'.format(action))
+        state = problem.result(state, action)
+        state.printState(unicode=False)
+    print('Actions on this problem: {}'.format(problem.actions(state)))
 
     if False:
         solution = search.tree_search(problem, [])
