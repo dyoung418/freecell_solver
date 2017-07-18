@@ -72,7 +72,7 @@ class Node(object):
             self.depth = parent.depth + 1
 
     def __repr__(self):
-        return "<Node {}>".format(self.state)
+        return "<Node {}>".format(repr(self.state)) #day: change specific to freecell
 
     def expand(self, problem):
         "List the nodes reachable in one step from this node."
@@ -103,7 +103,7 @@ class Node(object):
     # want in other contexts.]
 
     def __eq__(self, other):
-        return isinstance(other, Node) and self.state == other.state
+        return isinstance(other, Node) and repr(self.state) == repr(other.state)
 
     def __hash__(self):
         return hash(self.state)
