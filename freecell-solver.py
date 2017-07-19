@@ -206,7 +206,9 @@ class FreecellState(object):
             if areaCode != 's': # not stack
                 return True
             else:
-                if (card[RANK] == ranks[0]) and (card[SUIT] not in self.getStackSuits()):
+                #if (card[RANK] == ranks[0]) and (card[SUIT] not in self.getStackSuits()):
+                # Need to force stacks in HCDS order so that games match the GOAL at end.
+                if (card[RANK] == ranks[0]) and (suits.index(card[SUIT]) == index):
                     return True
                 else:
                     return False
@@ -228,20 +230,26 @@ class FreecellState(object):
 
 
 freecellGoal = FreecellState(stacks= [[r+suit for r in ranks] for suit in suits])
+#print(freecellGoal)
+#print(repr(freecellGoal))
 
 #######################################################################
 # Freecell problem
 
 class Freecell(search.Problem):
     """docstring for Freecell"""
-    def __init__(self, initial, goal=None, seed=1):
+    def __init__(self, initial, goal=None, seed=1, shorthand=None):
         super(Freecell, self).__init__(initial, goal)
         if not self.initial:
-            self.initial = FreecellState(dealSeed=seed)
+            if shorthand:
+                self.initial = FreecellState(shorthand=shorthand)
+            else:
+                self.initial = FreecellState(dealSeed=seed)
         if not isinstance(self.initial, FreecellState):
             raise TypeError
+        #import pdb; pdb.set_trace() #debug
         if not goal:
-            self.goal == freecellGoal
+            self.goal = FreecellState(stacks= [[r+suit for r in ranks] for suit in suits])
         self.lastActions = None
         self.lastState = self.initial
 
@@ -283,12 +291,42 @@ class Freecell(search.Problem):
     def __str__(self):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
-def heuristic(node):
-    '''function we want to minimize in our search'''
-    stack_depth = 0
+def heuristic1(node):
+    '''function we want to minimize in our search
+    simply counts cards not on stacks yet'''
+    stack_cards = 0
     for s in node.state.stacks:
-        stack_depth += len(s)
-    return (len(suits)*len(ranks)) - stack_depth
+        stack_cards += len(s)
+    return (len(suits)*len(ranks)) - stack_cards
+
+def heuristic2(node):
+    '''cards not on stack + cards in bay'''
+    stack_cards = 0
+    for s in node.state.stacks:
+        stack_cards += len(s)
+    bay_cards = 0
+    for b in node.state.bays:
+        bay_cards += len(b)
+    return (len(suits)*len(ranks)) - stack_cards + bay_cards
+
+def heuristic3(node):
+    '''cards not on stack + cards in bay + buried tableau cards 
+    (i.e. cards under at least one card of higher rank)'''
+    stack_cards = 0
+    for s in node.state.stacks:
+        stack_cards += len(s)
+    bay_cards = 0
+    for b in node.state.bays:
+        bay_cards += len(b)
+    buried_tableau_cards = 0
+    for t in node.state.tableau:
+        for i, bottomcard in enumerate(t):
+            bottomcardrank = ranks.index(bottomcard[RANK])
+            for topcard in t[i+1:]:
+                if bottomcardrank < ranks.index(topcard[RANK]):
+                    buried_tableau_cards += 1
+                    break
+    return (len(suits)*len(ranks)) - stack_cards + bay_cards + buried_tableau_cards
 
 if __name__ == '__main__':
     import doctest
@@ -296,7 +334,7 @@ if __name__ == '__main__':
     # Very hard seed is 11982
     seed = int(sys.argv[1]) if len(sys.argv) == 2 else random.randrange(1, 32000) # MS deals from 0 to 32k
     
-    if True:
+    if False:
         seed = 2659
         problem = Freecell(None, seed=seed)
         state = problem.initial
@@ -305,6 +343,13 @@ if __name__ == '__main__':
         shorthand = repr(problem.initial)
         print(shorthand)
         print(exec(shorthand))
+    if True:
+        testprob = Freecell(None, shorthand=str('_,_,_,_:KH,JC,KD,KS:KC,QC,'+'_,'*(maxTableauRows-2))[:-1])
+        print(testprob.initial)
+        print(repr(testprob.initial))
+        print(testprob.actions(testprob.initial))
+        print('goal= \n{}'.format(str(freecellGoal)))
+        print('repr(goal)= \n{}'.format(repr(freecellGoal)))
     if False:
         prob2659 = Freecell(None, seed=2659)
         prob2659.initial.printState(unicode=False)
@@ -323,13 +368,13 @@ if __name__ == '__main__':
             problem = prob5152
             print(problem)
             print('Starting...')
-            f = heuristic
+            f = heuristic3
             solution = search.best_first_graph_search(problem, f)
         except KeyboardInterrupt:
             print(str(problem))
             raise
 
-        print('Solution path is: {}'.format(solution.path()))
+        print('Solution path is: {}'.format(solution.solution()))
 
 
 

@@ -6,6 +6,7 @@ functions."""
 
 import utils #custom module
 import math, random, sys, time, bisect, string
+import sorted_collection
 
 #______________________________________________________________________________
 
@@ -209,27 +210,45 @@ def best_first_graph_search(problem, f):
     There is a subtlety: the line "f = memoize(f, 'f')" means that the f
     values will be cached on the nodes as they are computed. So after doing
     a best first search you can examine the f values of the path returned."""
-    f = utils.memoize(f, 'f')
-    node = Node(problem.initial)
-    if problem.goal_test(node.state):
-        return node
-    frontier = utils.PriorityQueue(min, f)
-    frontier.append(node)
-    explored = set()
-    while frontier:
-        node = frontier.pop()
+    try:
+        f = utils.memoize(f, 'f')
+        node = Node(problem.initial)
         if problem.goal_test(node.state):
             return node
-        explored.add(node.state)
-        for child in node.expand(problem):
-            if child.state not in explored and child not in frontier:
-                frontier.append(child)
-            elif child in frontier:
-                incumbent = frontier[child]
-                if f(child) < f(incumbent):
-                    del frontier[incumbent]
+        #frontier = utils.PriorityQueue(order=min, f=f)
+        frontier = sorted_collection.SortedCollection(key=f, order=min)
+        frontier.append(node)
+        explored = set()
+        while frontier:
+            node = frontier.pop()
+            if len(node.solution()) > 0: #debug
+                print('        examining node: {} (f={})\n{}'.format(node.solution()[-1], f(node), str(node.state))) # debug
+                # if(f(node)==0): #debug
+                #     print(repr(node.state)) #debug
+                #     import pdb; pdb.set_trace() #debug
+            if problem.goal_test(node.state):
+                return node
+            explored.add(node.state)
+            for child in node.expand(problem):
+                if child.state not in explored and child not in frontier:
                     frontier.append(child)
-    return None
+                elif child in frontier:
+                    # here we have a node already in frontier with the same
+                    # state.  We check to see if that 'incumbent' node
+                    # has a higher path cost.  If so, we replace the 
+                    # incumbent node with this new 'child' node (both
+                    # get to the same state thru different paths)
+                    incumbent = frontier.find_ge(f(child))
+                    #incumbent = frontier[child]
+    #                if f(child) < f(incumbent):
+                    if (f(child) < f(incumbent)) and (child == incumbent):
+                        del frontier[incumbent]
+                        frontier.append(child)
+        return None
+    except KeyboardInterrupt:
+        #print('frontier: {}, f-scores: {}'.format(frontier, list(map(f, frontier))))
+        print('child: {} (f={}), len(frontier)={}, len(explored)={}'.format(child, f(child), len(frontier), len(explored)))
+        raise
 
 def uniform_cost_search(problem):
     "[Fig. 3.14]"
