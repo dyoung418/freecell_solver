@@ -162,8 +162,8 @@ def graph_search(problem, frontier):
     explored = set()
     while frontier:
         node = frontier.pop()
-        if len(node.solution()) > 0:
-            print('        examining node: {}\n{}'.format(node.solution()[-1], str(node.state))) # debug
+        #if len(node.solution()) > 0: # debug
+            #print('        examining node: {}\n{}'.format(node.solution()[-1], str(node.state))) # debug
         if problem.goal_test(node.state):
             return node
         explored.add(node.state)
@@ -221,8 +221,8 @@ def best_first_graph_search(problem, f):
         explored = set()
         while frontier:
             node = frontier.pop()
-            if len(node.solution()) > 0: #debug
-                print('        examining node: {} (f={})\n{}'.format(node.solution()[-1], f(node), str(node.state))) # debug
+            #if len(node.solution()) > 0: #debug
+                #print('        examining node: {} (f={})\n{}'.format(node.solution()[-1], f(node), str(node.state))) # debug
                 # if(f(node)==0): #debug
                 #     print(repr(node.state)) #debug
                 #     import pdb; pdb.set_trace() #debug

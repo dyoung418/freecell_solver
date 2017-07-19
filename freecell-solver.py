@@ -1,4 +1,4 @@
-import search, freecell, random, math, collections, copy, sys, io
+import search, freecell, random, math, collections, copy, sys, io, time
 
 #######################################################################
 # Representing state in freecell:
@@ -328,6 +328,32 @@ def heuristic3(node):
                     break
     return (len(suits)*len(ranks)) - stack_cards + bay_cards + buried_tableau_cards
 
+def timedcall(fn, *args):
+    "Call function with args; return the time in seconds and result."
+    t0 = time.clock()
+    result = fn(*args)
+    t1 = time.clock()
+    return t1-t0, result
+
+def average(numbers):
+    "Return the average (arithmetic mean) of a sequence of numbers."
+    return sum(numbers) / float(len(numbers))
+
+def timedcalls(n, fn, *args):
+    """Call fn(*args) repeatedly: n times if n is an int, or up to
+    n seconds if n is a float; return the min, avg, and max time"""
+    if isinstance(n, int):
+        times = [timedcall(fn, *args)[0] for _ in range(n)]
+    else:
+        times = []
+        total = 0.0
+        while total < n:
+            t = timedcall(fn, *args)[0]
+            total += t
+            times.append(t)
+    return min(times), average(times), max(times)
+
+
 if __name__ == '__main__':
     import doctest
     doctest.testmod()
@@ -343,7 +369,7 @@ if __name__ == '__main__':
         shorthand = repr(problem.initial)
         print(shorthand)
         print(exec(shorthand))
-    if True:
+    if False:
         testprob = Freecell(None, shorthand=str('_,_,_,_:KH,JC,KD,KS:KC,QC,'+'_,'*(maxTableauRows-2))[:-1])
         print(testprob.initial)
         print(repr(testprob.initial))
@@ -361,7 +387,7 @@ if __name__ == '__main__':
             state.printState(unicode=True)
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
 
-    if True:
+    if False:
         try:
             prob2659 = Freecell(None, seed=2659)
             prob5152 = Freecell(None, seed=5152)
@@ -373,8 +399,19 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             print(str(problem))
             raise
+    if True:
+        try:
+            for i in range(20):
+                t0 = time.clock()
+                solution = search.best_first_graph_search(
+                    Freecell(None, seed=i), heuristic3)
+                t1 = time.clock()
+            print('Deal {} ({} sec): Solution path is: {}'.format(i, t1-t0, solution.solution()))
+        except KeyboardInterrupt:
+            print(str(problem))
+            raise
 
-        print('Solution path is: {}'.format(solution.solution()))
+
 
 
 
