@@ -342,7 +342,7 @@ def depthLowestRank(node):
     for i, s in enumerate(node.state.stacks):
         if len(s) > 0:
             suitNextStackRank[suits[i]] = ranks.index(s[-1][RANK])
-    lowestRankTableauCards = [s+ranks[suitNextStackRank[s]] for s in suits]
+    lowestRankTableauCards = [ranks[suitNextStackRank[s]]+s for s in suits]
     for t in node.state.tableau:
         for card in t:
             if card in lowestRankTableauCards:
@@ -396,6 +396,7 @@ def heuristic(node, w=None):
         ''' Good weights:
         9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
     numBTC, weightedBTC = buriedTableauCards(node)
+    import pdb; pdb.set_trace()
     val = {
         'cardsNotOnStacks':cardsNotOnStacks(node),
         'obviousUnstacked':obviousUnstacked(node),
@@ -482,7 +483,7 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             print(str(problem))
             raise
-    if True:
+    if False:
         try:
             for i in range(20):
                 t0 = time.clock()
