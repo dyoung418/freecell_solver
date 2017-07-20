@@ -202,7 +202,7 @@ def breadth_first_search(problem):
                 frontier.append(child)
     return None
 
-def best_first_graph_search(problem, f):
+def best_first_graph_search(problem, f, debug=False):
     """Search the nodes with the lowest f scores first.
     You specify the function f(node) that you want to minimize; for example,
     if f is a heuristic estimate to the goal, then we have greedy best
@@ -219,29 +219,38 @@ def best_first_graph_search(problem, f):
         frontier = sorted_collection.SortedCollection(key=f, order=min)
         frontier.append(node)
         explored = set()
+        if debug: debugfirstmoves = [] #debug
         while frontier:
             node = frontier.pop()
-            #if len(node.solution()) > 0: #debug
-                #print('        examining node: {} (f={})\n{}'.format(node.solution()[-1], f(node), str(node.state))) # debug
-                # if(f(node)==0): #debug
-                #     print(repr(node.state)) #debug
-                #     import pdb; pdb.set_trace() #debug
+            if debug:
+                if len(node.solution()) > 0:
+                #if (len(node.solution()) > 0) and (node.solution()[0] not in debugfirstmoves): #debug
+                    print('        examining node: {} (f={})\n{}'.format(node.solution()[-1], f(node), str(node.state))) # debug
+                    debugfirstmoves.append(node.solution()[0])
+                    #print('        examining node: {} (f={})\n{}'.format(node.solution(), f(node), str(node.state))) # debug
+                    # if(f(node)==0): #debug
+                    #     print(repr(node.state)) #debug
+                    #     import pdb; pdb.set_trace() #debug
             if problem.goal_test(node.state):
                 return node
-            explored.add(node.state)
+            explored.add(repr(node.state))
             for child in node.expand(problem):
-                if child.state not in explored and child not in frontier:
+                if repr(child.state) not in explored and child not in frontier:
                     frontier.append(child)
                 elif child in frontier:
+                    #import pdb; pdb.set_trace()
                     # here we have a node already in frontier with the same
                     # state.  We check to see if that 'incumbent' node
                     # has a higher path cost.  If so, we replace the 
                     # incumbent node with this new 'child' node (both
                     # get to the same state thru different paths)
-                    incumbent = frontier.find_ge(f(child))
+                    incumbent = frontier[frontier.index(child)]
                     #incumbent = frontier[child]
     #                if f(child) < f(incumbent):
+                    #print('FOUND AN INCUMBANT IN FRONTIER: state=state:{}, f(inccument)={}, f(child)={}'.format(
+                    #    repr(incumbent.state)==repr(child.state), f(incumbent), f(child)))
                     if (f(child) < f(incumbent)) and (child == incumbent):
+                        if debug: print('DELETING frontier[incumbent]')
                         del frontier[incumbent]
                         frontier.append(child)
         return None

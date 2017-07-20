@@ -1,4 +1,4 @@
-import search, freecell, random, math, collections, copy, sys, io, time
+import search, freecell, random, math, collections, copy, sys, io, time, functools
 
 #######################################################################
 # Representing state in freecell:
@@ -65,9 +65,9 @@ class FreecellState(object):
 
     def __repr__(self):
         '''Shorthand notation for the state -- should be code executable'''
-        bays = ','.join(self._getRowX(self.bays, 0))
-        stacks = ','.join(self._getRowX(self.stacks, -1))
-        tableau = ','.join( [','.join(self._getRowX(self.tableau, r)) for r in range(maxTableauRows)])
+        bays = ','.join(self.getRowX(self.bays, 0))
+        stacks = ','.join(self.getRowX(self.stacks, -1))
+        tableau = ','.join( [','.join(self.getRowX(self.tableau, r)) for r in range(maxTableauRows)])
         return 'FreecellState(shorthand="' + bays + ':' + stacks + ':' + tableau + '")'
 
     def __eq__(self, other):
@@ -79,7 +79,7 @@ class FreecellState(object):
     def __hash__(self):
         return hash(repr(self))
 
-    def _getRowX(self, listOfLists, x):
+    def getRowX(self, listOfLists, x):
         '''gets the xth row of a list of Lists where each inner
         list is considered to be a column.  If one inner column
         is shorter than others and has run out, return '_' for that
@@ -291,42 +291,123 @@ class Freecell(search.Problem):
     def __str__(self):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
-def heuristic1(node):
-    '''function we want to minimize in our search
-    simply counts cards not on stacks yet'''
-    stack_cards = 0
-    for s in node.state.stacks:
-        stack_cards += len(s)
-    return (len(suits)*len(ranks)) - stack_cards
+def cardsNotOnStacks(node):
+    return numCards - sum([len(s) for s in node.state.stacks])
 
-def heuristic2(node):
-    '''cards not on stack + cards in bay'''
-    stack_cards = 0
-    for s in node.state.stacks:
-        stack_cards += len(s)
-    bay_cards = 0
-    for b in node.state.bays:
-        bay_cards += len(b)
-    return (len(suits)*len(ranks)) - stack_cards + bay_cards
+def obviousUnstacked(node):
+    r = 0
+    edges = node.state.getRowX(node.state.tableau, -1)
+    for card in edges:
+        if card != '_' and (
+           node.state.validSpot('s0', card) or \
+           node.state.validSpot('s1', card) or \
+           node.state.validSpot('s2', card) or \
+           node.state.validSpot('s3', card)):
+           r += 1
+    return r
 
-def heuristic3(node):
-    '''cards not on stack + cards in bay + buried tableau cards 
-    (i.e. cards under at least one card of higher rank)'''
-    stack_cards = 0
-    for s in node.state.stacks:
-        stack_cards += len(s)
-    bay_cards = 0
+def cardsInBay(node):
+    return sum([len(b) for b in node.state.bays])
+
+def bayCardsThatCouldBeTableau(node):
+    r = 0
     for b in node.state.bays:
-        bay_cards += len(b)
+        if len(b) > 0:
+            for i, t in enumerate(node.state.tableau):
+                if len(t) > 0:
+                    if node.state.validSpot('t'+str(i), b[0]):
+                        r += 1
+                        break
+    return r
+
+def buriedTableauCards(node):
+    rankWeights = [w for w in range(len(ranks), -1, -1)]
     buried_tableau_cards = 0
+    depth_buried_tableau_cards = 0
     for t in node.state.tableau:
         for i, bottomcard in enumerate(t):
             bottomcardrank = ranks.index(bottomcard[RANK])
-            for topcard in t[i+1:]:
+            for j, topcard in enumerate(t[i+1:]):
                 if bottomcardrank < ranks.index(topcard[RANK]):
-                    buried_tableau_cards += 1
+                    buried_tableau_cards += 1 * rankWeights[bottomcardrank]
+                    depth_buried_tableau_cards += (len(t) - (i+j)) * rankWeights[bottomcardrank]
                     break
-    return (len(suits)*len(ranks)) - stack_cards + bay_cards + buried_tableau_cards
+    return (buried_tableau_cards, depth_buried_tableau_cards)
+
+def depthLowestRank(node):
+    '''The depth in the tableau of the lowest un-stacked rank
+    of each suit added together'''
+    r = 0
+    suitNextStackRank = {'H':0, 'C':0, 'D':0, 'S':0}
+    for i, s in enumerate(node.state.stacks):
+        if len(s) > 0:
+            suitNextStackRank[suits[i]] = ranks.index(s[-1][RANK])
+    lowestRankTableauCards = [s+ranks[suitNextStackRank[s]] for s in suits]
+    for t in node.state.tableau:
+        for card in t:
+            if card in lowestRankTableauCards:
+                r += len(t) - t.index(card)
+    return r
+
+def stackCardsAheadOfNeighborSuit(node):
+    '''Stack cards that have run ahead of neighbor suits.
+    For example, if both red stacks are at 4 (4H and 4D)
+    but black cards are only at Ace, that means that there
+    are no cards for the black 3's to be placed on in the 
+    tableaus (black 2s are OK since black Aces are already
+    in the stacks)'''
+    suitNextStackRank = {'H':0, 'C':0, 'D':0, 'S':0}
+    for i, s in enumerate(node.state.stacks):
+        if len(s) > 0:
+            suitNextStackRank[suits[i]] = ranks.index(s[-1][RANK])
+    blackMin = min(suitNextStackRank['C'], suitNextStackRank['S'])
+    redMin = min(suitNextStackRank['H'], suitNextStackRank['D'])
+    return abs(redMin - blackMin)
+
+def nonEmptyTableaus(node):
+    return sum([1 for t in node.state.tableau if len(t)>0])
+
+maxVal = {
+            'cardsNotOnStacks':numCards,
+            'cardsInBay':4,
+            'numBuriedTableauCards':numCards - tableauCols,
+            'weightedBuriedTableauCards': sum([r * rr for r in range(len(ranks)-1) 
+                                                      for rr in range(len(ranks)-1, -1, -1)]),
+            'stackCardsAheadOfNeighborSuit':len(ranks)-1,
+            'bayCardsThatCouldBeTableau': 4,
+            'nonEmptyTableaus': tableauCols,
+            'depthLowestRank': len(suits)*(numCards/tableauCols),
+            'obviousUnstacked': len(suits),
+}
+
+def heuristic(node, w=None):
+    if not w:
+        w = {
+            'cardsNotOnStacks':                 9,
+            'obviousUnstacked':                 0,
+            'cardsInBay':                       1,
+            'numBuriedTableauCards':            0,
+            'weightedBuriedTableauCards':       0.5,
+            'depthLowestRank':                  0,
+            'stackCardsAheadOfNeighborSuit':    0,
+            'bayCardsThatCouldBeTableau':       0,
+            'nonEmptyTableaus':                 0,
+        }
+        ''' Good weights:
+        9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
+    numBTC, weightedBTC = buriedTableauCards(node)
+    val = {
+        'cardsNotOnStacks':cardsNotOnStacks(node),
+        'obviousUnstacked':obviousUnstacked(node),
+        'cardsInBay':cardsInBay(node),
+        'numBuriedTableauCards':numBTC,
+        'weightedBuriedTableauCards':weightedBTC,
+        'depthLowestRank':depthLowestRank(node),
+        'stackCardsAheadOfNeighborSuit':stackCardsAheadOfNeighborSuit(node),
+        'bayCardsThatCouldBeTableau':bayCardsThatCouldBeTableau(node),
+        'nonEmptyTableaus':nonEmptyTableaus(node),
+    }
+    return sum([w[i] * val[i]/maxVal[i] for i in maxVal.keys()])
 
 def timedcall(fn, *args):
     "Call function with args; return the time in seconds and result."
@@ -387,15 +468,17 @@ if __name__ == '__main__':
             state.printState(unicode=True)
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
 
-    if False:
+    if True:
         try:
             prob2659 = Freecell(None, seed=2659)
             prob5152 = Freecell(None, seed=5152)
             problem = prob5152
             print(problem)
             print('Starting...')
-            f = heuristic3
-            solution = search.best_first_graph_search(problem, f)
+            t0 = time.clock()
+            solution = search.best_first_graph_search(problem, heuristic, debug=False)
+            t1 = time.clock()
+            print('Deal {} ({} sec): Solution path is: {}'.format(5152, t1-t0, solution.solution()))
         except KeyboardInterrupt:
             print(str(problem))
             raise
@@ -403,8 +486,8 @@ if __name__ == '__main__':
         try:
             for i in range(20):
                 t0 = time.clock()
-                solution = search.best_first_graph_search(
-                    Freecell(None, seed=i), heuristic3)
+                problem = Freecell(None, seed=i)
+                solution = search.best_first_graph_search(problem, heuristic, debug=True)
                 t1 = time.clock()
             print('Deal {} ({} sec): Solution path is: {}'.format(i, t1-t0, solution.solution()))
         except KeyboardInterrupt:
