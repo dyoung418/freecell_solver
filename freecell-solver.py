@@ -1,4 +1,4 @@
-import search, freecell, random, math, collections, copy, sys, io, time, functools
+import search, msfreecell, random, math, collections, copy, sys, io, time, functools
 
 #######################################################################
 # Representing state in freecell:
@@ -47,10 +47,10 @@ class FreecellState(object):
                 # leaf cards.
                 self.tableau = [[] for c in range(tableauCols)]
                 if dealSeed:
-                    randomDeal = freecell.msFreecellDeal(dealSeed)
+                    randomDeal = msfreecell.msFreecellDeal(dealSeed)
                     for i, card in enumerate(randomDeal):
                         # TODO, pull in msCardNumToString into this object
-                        self.tableau[i%tableauCols].append(freecell.msCardNumToString(card))
+                        self.tableau[i%tableauCols].append(msfreecell.msCardNumToString(card))
             if stacks:
                 self.stacks = copy.deepcopy(stacks)
             else:
@@ -323,16 +323,27 @@ def bayCardsThatCouldBeTableau(node):
 def buriedTableauCards(node):
     rankWeights = [w for w in range(len(ranks), -1, -1)]
     buried_tableau_cards = 0
+    for t in node.state.tableau:
+        for i, bottomcard in enumerate(t):
+            bottomcardrank = ranks.index(bottomcard[RANK])
+            for j, topcard in enumerate(t[i+1:]):
+                if bottomcardrank < ranks.index(topcard[RANK]):
+                    #buried_tableau_cards += 1 * rankWeights[bottomcardrank]
+                    buried_tableau_cards += 1
+                    break
+    return buried_tableau_cards
+
+def depthBuriedTableauCards(node):
+    rankWeights = [w for w in range(len(ranks), -1, -1)]
     depth_buried_tableau_cards = 0
     for t in node.state.tableau:
         for i, bottomcard in enumerate(t):
             bottomcardrank = ranks.index(bottomcard[RANK])
             for j, topcard in enumerate(t[i+1:]):
                 if bottomcardrank < ranks.index(topcard[RANK]):
-                    buried_tableau_cards += 1 * rankWeights[bottomcardrank]
                     depth_buried_tableau_cards += (len(t) - (i+j)) * rankWeights[bottomcardrank]
                     break
-    return (buried_tableau_cards, depth_buried_tableau_cards)
+    return depth_buried_tableau_cards
 
 def depthLowestRank(node):
     '''The depth in the tableau of the lowest un-stacked rank
@@ -367,17 +378,18 @@ def stackCardsAheadOfNeighborSuit(node):
 def nonEmptyTableaus(node):
     return sum([1 for t in node.state.tableau if len(t)>0])
 
-maxVal = {
-            'cardsNotOnStacks':numCards,
-            'cardsInBay':4,
-            'numBuriedTableauCards':numCards - tableauCols,
-            'weightedBuriedTableauCards': sum([r * rr for r in range(len(ranks)-1) 
+heuristics = {
+            'cardsNotOnStacks':{'max':numCards, 'function':cardsNotOnStacks},
+            'cardsInBay':{'max':4, 'function':cardsInBay},
+            'buriedTableauCards':{'max':numCards - tableauCols, 'function':buriedTableauCards},
+            'depthBuriedTableauCards':{'max': sum([r * rr for r in range(len(ranks)-1) 
                                                       for rr in range(len(ranks)-1, -1, -1)]),
-            'stackCardsAheadOfNeighborSuit':len(ranks)-1,
-            'bayCardsThatCouldBeTableau': 4,
-            'nonEmptyTableaus': tableauCols,
-            'depthLowestRank': len(suits)*(numCards/tableauCols),
-            'obviousUnstacked': len(suits),
+                                          'function':depthBuriedTableauCards},
+            'stackCardsAheadOfNeighborSuit':{'max':len(ranks)-1,'function':stackCardsAheadOfNeighborSuit},
+            'bayCardsThatCouldBeTableau': {'max':4,'function':bayCardsThatCouldBeTableau},
+            'nonEmptyTableaus': {'max':tableauCols, 'function':nonEmptyTableaus},
+            'depthLowestRank': {'max':len(suits)*(numCards/tableauCols), 'function':depthLowestRank},
+            'obviousUnstacked': {'max':len(suits), 'function':obviousUnstacked},
 }
 
 def heuristic(node, w=None):
@@ -386,8 +398,8 @@ def heuristic(node, w=None):
             'cardsNotOnStacks':                 9,
             'obviousUnstacked':                 0,
             'cardsInBay':                       1,
-            'numBuriedTableauCards':            0,
-            'weightedBuriedTableauCards':       0.5,
+            'buriedTableauCards':               0,
+            'depthBuriedTableauCards':          0.5,
             'depthLowestRank':                  0,
             'stackCardsAheadOfNeighborSuit':    0,
             'bayCardsThatCouldBeTableau':       0,
@@ -395,20 +407,12 @@ def heuristic(node, w=None):
         }
         ''' Good weights:
         9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
-    numBTC, weightedBTC = buriedTableauCards(node)
-    import pdb; pdb.set_trace()
-    val = {
-        'cardsNotOnStacks':cardsNotOnStacks(node),
-        'obviousUnstacked':obviousUnstacked(node),
-        'cardsInBay':cardsInBay(node),
-        'numBuriedTableauCards':numBTC,
-        'weightedBuriedTableauCards':weightedBTC,
-        'depthLowestRank':depthLowestRank(node),
-        'stackCardsAheadOfNeighborSuit':stackCardsAheadOfNeighborSuit(node),
-        'bayCardsThatCouldBeTableau':bayCardsThatCouldBeTableau(node),
-        'nonEmptyTableaus':nonEmptyTableaus(node),
-    }
-    return sum([w[i] * val[i]/maxVal[i] for i in maxVal.keys()])
+    #import pdb; pdb.set_trace()
+    val = {}
+    for h in w:
+        if w[h] > 0:
+            val[h] = heuristics[h]['function'](node)
+    return sum([w[i] * val[i]/heuristics[i]['max'] for i in val.keys()])
 
 def timedcall(fn, *args):
     "Call function with args; return the time in seconds and result."
