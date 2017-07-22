@@ -34,7 +34,10 @@ class FreecellState(object):
                     self.bays[i%self.bayMax].append(val)
             for i, val in enumerate(s2.split(',')):
                 if val != '_':
-                    self.stacks[i%len(suits)].append(val)
+                    rank, suit = tuple(val)
+                    for r in range(ranks.index(rank)+1):
+                        self.stacks[i%len(suits)].append(ranks[r]+suit)
+                    #self.stacks[i%len(suits)].append(val)
             for i, val in enumerate(t2.split(',')):
                 if val != '_':
                     self.tableau[i%tableauCols].append(val)
@@ -292,6 +295,8 @@ class Freecell(search.Problem):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
 def cardsNotOnStacks(node):
+    # TODO, this doesn't work if the state is initialized with a shorthand as
+    # currently written because it only puts the top card on the stack.
     return numCards - sum([len(s) for s in node.state.stacks])
 
 def obviousUnstacked(node):
@@ -396,14 +401,14 @@ def heuristic(node, w=None):
     if not w:
         w = {
             'cardsNotOnStacks':                 9,
-            'obviousUnstacked':                 0,
+            'obviousUnstacked':                 1,
             'cardsInBay':                       1,
-            'buriedTableauCards':               0,
+            'buriedTableauCards':               1,
             'depthBuriedTableauCards':          0.5,
-            'depthLowestRank':                  0,
-            'stackCardsAheadOfNeighborSuit':    0,
-            'bayCardsThatCouldBeTableau':       0,
-            'nonEmptyTableaus':                 0,
+            'depthLowestRank':                  1,
+            'stackCardsAheadOfNeighborSuit':    1,
+            'bayCardsThatCouldBeTableau':       1,
+            'nonEmptyTableaus':                 1,
         }
         ''' Good weights:
         9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
@@ -412,6 +417,8 @@ def heuristic(node, w=None):
     for h in w:
         if w[h] > 0:
             val[h] = heuristics[h]['function'](node)
+    print(val) # debug
+    print(node.state) # debug
     return sum([w[i] * val[i]/heuristics[i]['max'] for i in val.keys()])
 
 def timedcall(fn, *args):
@@ -455,6 +462,10 @@ if __name__ == '__main__':
         shorthand = repr(problem.initial)
         print(shorthand)
         print(exec(shorthand))
+    if True:
+        print(repr(freecellGoal))
+        print('freecell goal =')
+        print(exec(repr(freecellGoal)))
     if False:
         testprob = Freecell(None, shorthand=str('_,_,_,_:KH,JC,KD,KS:KC,QC,'+'_,'*(maxTableauRows-2))[:-1])
         print(testprob.initial)
@@ -473,7 +484,7 @@ if __name__ == '__main__':
             state.printState(unicode=True)
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
 
-    if True:
+    if False:
         try:
             prob2659 = Freecell(None, seed=2659)
             prob5152 = Freecell(None, seed=5152)
@@ -485,6 +496,7 @@ if __name__ == '__main__':
             t1 = time.clock()
             print('Deal {} ({} sec): Solution path is: {}'.format(5152, t1-t0, solution.solution()))
         except KeyboardInterrupt:
+            import pdb; pdb.set_trace()
             print(str(problem))
             raise
     if False:
