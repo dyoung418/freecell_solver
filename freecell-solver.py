@@ -25,7 +25,8 @@ class FreecellState(object):
         self.bayMax = bayMax
         self.dealSeed = dealSeed
         if shorthand:
-            b2, s2, t2 = shorthand.split(':')
+            nospace_shorthand = shorthand.translate(shorthand.maketrans({' ':None, '\n':None, '\t':None}))
+            b2, s2, t2 = nospace_shorthand.split(':')
             self.bays = [[] for b in range(self.bayMax)] 
             self.stacks = [[] for s in range(len(suits))]
             self.tableau = [[] for c in range(tableauCols)]
@@ -38,9 +39,13 @@ class FreecellState(object):
                     for r in range(ranks.index(rank)+1):
                         self.stacks[i%len(suits)].append(ranks[r]+suit)
                     #self.stacks[i%len(suits)].append(val)
-            for i, val in enumerate(t2.split(',')):
-                if val != '_':
-                    self.tableau[i%tableauCols].append(val)
+            for i, row in enumerate(t2.split(';')):
+                for j, val in enumerate(row.split(',')):
+                    if val != '_':
+                        self.tableau[j%tableauCols].append(val)
+            # for i, val in enumerate(t2.split(',')):
+            #     if val != '_':
+            #         self.tableau[i%tableauCols].append(val)
         else:
             if tableau:
                 self.tableau = copy.deepcopy(tableau)
@@ -70,7 +75,7 @@ class FreecellState(object):
         '''Shorthand notation for the state -- should be code executable'''
         bays = ','.join(self.getRowX(self.bays, 0))
         stacks = ','.join(self.getRowX(self.stacks, -1))
-        tableau = ','.join( [','.join(self.getRowX(self.tableau, r)) for r in range(maxTableauRows)])
+        tableau = ';'.join( [','.join(self.getRowX(self.tableau, r)) for r in range(maxTableauRows)])
         return 'FreecellState(shorthand="' + bays + ':' + stacks + ':' + tableau + '")'
 
     def __eq__(self, other):
@@ -295,11 +300,16 @@ class Freecell(search.Problem):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
 def cardsNotOnStacks(node):
-    # TODO, this doesn't work if the state is initialized with a shorthand as
-    # currently written because it only puts the top card on the stack.
     return numCards - sum([len(s) for s in node.state.stacks])
 
 def obviousUnstacked(node):
+    '''Count of cards in the tableau that could be placed on
+    the stack right now.
+    NOTE: this one is counterproductive as a heuristic because
+    it penalizes a move that exposes an obviousUnstack.  For example,
+    A King covering an Ace is moved to the bay.  That move
+    *increases* the heuristic (which needs to be minimized) because
+    now the Ace is an obviousUnstacked'''
     r = 0
     edges = node.state.getRowX(node.state.tableau, -1)
     for card in edges:
@@ -326,27 +336,29 @@ def bayCardsThatCouldBeTableau(node):
     return r
 
 def buriedTableauCards(node):
+    '''Count of cards in the tableau which have a higher rank card
+    on top of them'''
     rankWeights = [w for w in range(len(ranks), -1, -1)]
     buried_tableau_cards = 0
-    for t in node.state.tableau:
-        for i, bottomcard in enumerate(t):
+    for tCol in node.state.tableau:
+        for i, bottomcard in enumerate(tCol):
             bottomcardrank = ranks.index(bottomcard[RANK])
-            for j, topcard in enumerate(t[i+1:]):
-                if bottomcardrank < ranks.index(topcard[RANK]):
+            for j, topcard in enumerate(tCol[i+1:]):
+                if bottomcardrank <= ranks.index(topcard[RANK]):
                     #buried_tableau_cards += 1 * rankWeights[bottomcardrank]
                     buried_tableau_cards += 1
                     break
     return buried_tableau_cards
 
 def depthBuriedTableauCards(node):
-    rankWeights = [w for w in range(len(ranks), -1, -1)]
+    rankWeights = [w for w in range(len(ranks)-1, -1, -1)]
     depth_buried_tableau_cards = 0
-    for t in node.state.tableau:
-        for i, bottomcard in enumerate(t):
+    for tCol in node.state.tableau:
+        for i, bottomcard in enumerate(tCol):
             bottomcardrank = ranks.index(bottomcard[RANK])
-            for j, topcard in enumerate(t[i+1:]):
+            for j, topcard in enumerate(tCol[i+1:]):
                 if bottomcardrank < ranks.index(topcard[RANK]):
-                    depth_buried_tableau_cards += (len(t) - (i+j)) * rankWeights[bottomcardrank]
+                    depth_buried_tableau_cards += (len(tCol) - (i+j)) * rankWeights[bottomcardrank]
                     break
     return depth_buried_tableau_cards
 
@@ -357,12 +369,12 @@ def depthLowestRank(node):
     suitNextStackRank = {'H':0, 'C':0, 'D':0, 'S':0}
     for i, s in enumerate(node.state.stacks):
         if len(s) > 0:
-            suitNextStackRank[suits[i]] = ranks.index(s[-1][RANK])
-    lowestRankTableauCards = [ranks[suitNextStackRank[s]]+s for s in suits]
+            suitNextStackRank[suits[i]] = ranks[min(len(ranks)-1,ranks.index(s[-1][RANK])+1)] # i.e. stack rank + 1
+    lowestRankNonStackCards = [suitNextStackRank[s]+s for s in suits]
     for t in node.state.tableau:
-        for card in t:
-            if card in lowestRankTableauCards:
-                r += len(t) - t.index(card)
+        for ic, card in enumerate(t):
+            if card in lowestRankNonStackCards:
+                r += len(t) - ic -1 
     return r
 
 def stackCardsAheadOfNeighborSuit(node):
@@ -401,7 +413,7 @@ def heuristic(node, w=None):
     if not w:
         w = {
             'cardsNotOnStacks':                 9,
-            'obviousUnstacked':                 1,
+            'obviousUnstacked':                 0,
             'cardsInBay':                       1,
             'buriedTableauCards':               1,
             'depthBuriedTableauCards':          0.5,
@@ -461,11 +473,26 @@ if __name__ == '__main__':
         problem.initial.printState()
         shorthand = repr(problem.initial)
         print(shorthand)
-        print(exec(shorthand))
-    if True:
+        print(eval(shorthand))
+    if False:
         print(repr(freecellGoal))
         print('freecell goal =')
-        print(exec(repr(freecellGoal)))
+        print(eval(repr(freecellGoal)))
+    if True:
+        testState = FreecellState(shorthand='''JS,_,_,_:QH,KC,KD,9S:
+             _,TS,_,_,_,KS,_,_
+            ;_,KH,_,_,_,_,_,_
+            ;_,QS,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_''')
+        problem = Freecell(initial=testState)
+        solution = search.best_first_graph_search(problem, heuristic, debug=True)
     if False:
         testprob = Freecell(None, shorthand=str('_,_,_,_:KH,JC,KD,KS:KC,QC,'+'_,'*(maxTableauRows-2))[:-1])
         print(testprob.initial)

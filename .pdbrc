@@ -1,0 +1,3 @@
+alias pi for k in %1.__dict__.keys(): print("%1.",k,"=",%1.__dict__[k])
+alias ps pi self
+alias ns p print(node.state)
