@@ -107,12 +107,13 @@ class FreecellState(object):
                     result.append('_')
         return result
 
-    def printState(self, unicode=True, file=sys.stdout):
+    def printState(self, unicode=True, file=sys.stdout, tableauLabels=True):
         if unicode:
             empty = '\N{WHITE VERTICAL RECTANGLE} '
         else:
             empty = '__'
-        tableauEmpty = '  '
+        #tableauEmpty = '  '
+        tableauEmpty = '__'
         space = '  '
         if self.dealSeed:
             print('Deal number {}:'.format(self.dealSeed), file=file)
@@ -143,6 +144,9 @@ class FreecellState(object):
                 break
             print('', file=file)
         print('', file=file)
+        if tableauLabels:
+            print('', file=file)
+            print(space.join([' 0',' 1',' 2',' 3',' 4',' 5',' 6',' 7']), file=file)
 
     def printableCard(self, card, unicode=True):
         if unicode:
@@ -429,8 +433,8 @@ def heuristic(node, w=None):
     for h in w:
         if w[h] > 0:
             val[h] = heuristics[h]['function'](node)
-    print(val) # debug
-    print(node.state) # debug
+    #print(val) # debug
+    #print(node.state) # debug
     return sum([w[i] * val[i]/heuristics[i]['max'] for i in val.keys()])
 
 def timedcall(fn, *args):
