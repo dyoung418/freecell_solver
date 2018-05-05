@@ -483,6 +483,7 @@ if __name__ == '__main__':
         print('freecell goal =')
         print(eval(repr(freecellGoal)))
     if True:
+        # This is a good thing to run if you are coming back after a long period away
         testState = FreecellState(shorthand='''JS,_,_,_:QH,KC,KD,9S:
              _,TS,_,_,_,KS,_,_
             ;_,KH,_,_,_,_,_,_
