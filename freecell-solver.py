@@ -12,10 +12,13 @@ validTableauNeighborSuit = {'H':['C','S'], 'C':['H','D'],
 RANK = 0
 SUIT = 1
 
-# Actions
 # t3:s2 means 'tableau column 3 to stack 2'
 # b1:t4 means 'bay one to tableau column 4'
 #
+# Actions
+# 1. Have a dict of where each card is (key=cardcode, val=where it is, such as t3 or b0).  Then
+#    when listing all possible moves, start first with the stacks that have the next lowest
+#    cards that aren't already in the stacks.
 
 
 class FreecellState(object):
