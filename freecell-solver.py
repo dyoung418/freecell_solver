@@ -12,6 +12,9 @@ validTableauNeighborSuit = {'H':['C','S'], 'C':['H','D'],
 RANK = 0
 SUIT = 1
 
+allCardsInPriority = [r+s for r in ranks for s in suits]
+#print(allCardsInPriority) #debug
+
 # t3:s2 means 'tableau column 3 to stack 2'
 # b1:t4 means 'bay one to tableau column 4'
 #
@@ -27,6 +30,7 @@ class FreecellState(object):
         #print('debug: FreecellState.__init__: dealSeed={}, tableau={}'.format(dealSeed,tableau))
         self.bayMax = bayMax
         self.dealSeed = dealSeed
+        self.cardLocations = {}
         if shorthand:
             nospace_shorthand = shorthand.translate(shorthand.maketrans({' ':None, '\n':None, '\t':None}))
             b2, s2, t2 = nospace_shorthand.split(':')
@@ -54,8 +58,7 @@ class FreecellState(object):
                 self.tableau = copy.deepcopy(tableau)
             else:
                 # Note: tableau is a list of lists.  The inner lists are the
-                # *columns*, not the rows.  That makes it easier to see the
-                # leaf cards.
+                # *columns*, not the rows.  (easier to see the leaf cards.)
                 self.tableau = [[] for c in range(tableauCols)]
                 if dealSeed:
                     randomDeal = msfreecell.msFreecellDeal(dealSeed)
@@ -73,6 +76,19 @@ class FreecellState(object):
         self.everyLocation = ['b'+str(b) for b in range(self.bayMax)] # Bays
         self.everyLocation += ['s'+str(s) for s in range(len(suits))] # Stacks
         self.everyLocation += ['t'+str(t) for t in range(tableauCols)] # Tableaus
+        self.__initializeCardLocations()
+
+    def __initializeCardLocations(self):
+        for i, bay in enumerate(self.bays):
+            if len(bay) > 0:
+                self.cardLocations[bay[0]] = "b"+str(i);
+        for i, stack in enumerate(self.stacks):
+            for j in range(len(stack)):
+                self.cardLocations[stack[j]] = "s"+str(i);
+        for i, tableau in enumerate(self.tableau):
+            for j in range(len(tableau)):
+                self.cardLocations[tableau[j]] = "t"+str(i)+":"+str(j)
+        #print(self.cardLocations) # debug
 
     def __repr__(self):
         '''Shorthand notation for the state -- should be code executable'''
@@ -262,7 +278,7 @@ class Freecell(search.Problem):
                 self.initial = FreecellState(dealSeed=seed)
         if not isinstance(self.initial, FreecellState):
             raise TypeError
-        #import pdb; pdb.set_trace() #debug
+        import pdb; pdb.set_trace() #debug
         if not goal:
             self.goal = FreecellState(stacks= [[r+suit for r in ranks] for suit in suits])
         self.lastActions = None
@@ -273,6 +289,7 @@ class Freecell(search.Problem):
         state. The result would typically be a list, but if there are
         many actions, consider yielding them one at a time in an
         iterator, rather than building them all at once."""
+        oldway = '''
         result = []
         for loc in state.everyLocation:
             if loc[0] == 's': continue # don't allow movement off stacks
@@ -283,6 +300,27 @@ class Freecell(search.Problem):
                         if state.validSpot(otherLoc, card):
                             result.append(loc+':'+otherLoc)
         #print('debug: actions: {}'.format(result))
+        self.lastActions = result
+        self.lastState = state
+        return result
+        '''
+        result = []
+        for card in allCardsInPriority:
+            loc = state.cardLocations[card]
+            if loc[0] == 's': continue # don't allow movement off stacks
+            if loc[0] == 't': # allCardsInPriority includes row info for tableau (e.g. "t3:1")
+                locparts = loc.split(sep=':', maxsplit=1)
+                loc = locparts[0]
+                row = int(locparts[1])
+                #print("card {}, loc {}, row {}, len of column {}".format(card,loc,row,len(state.tableau[int(loc[1])]))) #debug
+                if row < len(state.tableau[int(loc[1])]) -1: continue # can't move tableau card unless at bottom of column
+            for otherLoc in state.everyLocation:
+                if loc != otherLoc:
+                    if (loc[0]=='b') and (otherLoc[0]=='b'): continue
+                    if (loc[0]=='s') and (otherLoc[0]=='s'): continue
+                    if state.validSpot(otherLoc, card):
+                        result.append(loc+':'+otherLoc)
+        print('debug: actions: {}'.format(result))
         self.lastActions = result
         self.lastState = state
         return result
@@ -500,6 +538,7 @@ if __name__ == '__main__':
             ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_''')
         problem = Freecell(initial=testState)
+        print("----------------")
         solution = search.best_first_graph_search(problem, heuristic, debug=True)
     if False:
         testprob = Freecell(None, shorthand=str('_,_,_,_:KH,JC,KD,KS:KC,QC,'+'_,'*(maxTableauRows-2))[:-1])
