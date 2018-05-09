@@ -18,10 +18,14 @@ allCardsInPriority = [r+s for r in ranks for s in suits]
 # t3:s2 means 'tableau column 3 to stack 2'
 # b1:t4 means 'bay one to tableau column 4'
 #
-# Actions
+# Actions TODO
 # 1. Have a dict of where each card is (key=cardcode, val=where it is, such as t3 or b0).  Then
 #    when listing all possible moves, start first with the stacks that have the next lowest
 #    cards that aren't already in the stacks.
+# 2. Instead of doing the cardLocation dict, change "action" so that it is origin:destination:card 
+#    instead of orgin:destination.  (e.g. "t1:b0:9H" instead of "t1:b0").  Then you can have a 
+#    heuristic that favors nodes whose action acts on priority cards (Nodes include the state and
+#    the action that gets to that state and other things)
 
 
 class FreecellState(object):
@@ -87,7 +91,8 @@ class FreecellState(object):
                 self.cardLocations[stack[j]] = "s"+str(i);
         for i, tableau in enumerate(self.tableau):
             for j in range(len(tableau)):
-                self.cardLocations[tableau[j]] = "t"+str(i)+":"+str(j)
+                #self.cardLocations[tableau[j]] = "t"+str(i)+":"+str(j)
+                self.cardLocations[tableau[j]] = "t"+str(i)
         #print(self.cardLocations) # debug
 
     def __repr__(self):
@@ -190,6 +195,8 @@ class FreecellState(object):
             dest_areaCode, dest_index = tuple(destination)
             dest_index = int(dest_index)
             self.getArea(destination)[dest_index].append(card)
+            # update card locations  DAY TODO -  update depth info on tableau cards
+            self.cardLocations[card] = destination
         else:
             raise RuntimeError
 
@@ -269,7 +276,7 @@ freecellGoal = FreecellState(stacks= [[r+suit for r in ranks] for suit in suits]
 
 class Freecell(search.Problem):
     """docstring for Freecell"""
-    def __init__(self, initial, goal=None, seed=1, shorthand=None):
+    def __init__(self, initial, goal=None, seed=1, shorthand=None, debug=False):
         super(Freecell, self).__init__(initial, goal)
         if not self.initial:
             if shorthand:
@@ -278,11 +285,12 @@ class Freecell(search.Problem):
                 self.initial = FreecellState(dealSeed=seed)
         if not isinstance(self.initial, FreecellState):
             raise TypeError
-        import pdb; pdb.set_trace() #debug
+        #import pdb; pdb.set_trace() #debug
         if not goal:
             self.goal = FreecellState(stacks= [[r+suit for r in ranks] for suit in suits])
         self.lastActions = None
         self.lastState = self.initial
+        if debug: print('Problem initial state:\n{}\n'.format(str(self.initial)))
 
     def actions(self, state):
         """Return the actions that can be executed in the given
@@ -305,20 +313,26 @@ class Freecell(search.Problem):
         return result
         '''
         result = []
+        locsAdded = {}
         for card in allCardsInPriority:
             loc = state.cardLocations[card]
+            if loc in locsAdded:  # don't duplicate starting locs already considered
+                continue
+            else:
+                locsAdded[loc] = 1
             if loc[0] == 's': continue # don't allow movement off stacks
-            if loc[0] == 't': # allCardsInPriority includes row info for tableau (e.g. "t3:1")
-                locparts = loc.split(sep=':', maxsplit=1)
-                loc = locparts[0]
-                row = int(locparts[1])
-                #print("card {}, loc {}, row {}, len of column {}".format(card,loc,row,len(state.tableau[int(loc[1])]))) #debug
-                if row < len(state.tableau[int(loc[1])]) -1: continue # can't move tableau card unless at bottom of column
+            #if loc[0] == 't': # allCardsInPriority includes row info for tableau (e.g. "t3:1")
+            #    locparts = loc.split(sep=':', maxsplit=1)
+            #    loc = locparts[0]
+            #    row = int(locparts[1])
+            #    #print("card {}, loc {}, row {}, len of column {}".format(card,loc,row,len(state.tableau[int(loc[1])]))) #debug
+            #    if row < len(state.tableau[int(loc[1])]) -1: continue # can't move tableau card unless at bottom of column
             for otherLoc in state.everyLocation:
                 if loc != otherLoc:
                     if (loc[0]=='b') and (otherLoc[0]=='b'): continue
                     if (loc[0]=='s') and (otherLoc[0]=='s'): continue
-                    if state.validSpot(otherLoc, card):
+                    #if state.validSpot(otherLoc, card):
+                    if state.validSpot(otherLoc, state.getCard(loc)):
                         result.append(loc+':'+otherLoc)
         print('debug: actions: {}'.format(result))
         self.lastActions = result
@@ -458,14 +472,14 @@ def heuristic(node, w=None):
     if not w:
         w = {
             'cardsNotOnStacks':                 9,
-            'obviousUnstacked':                 0,
-            'cardsInBay':                       1,
-            'buriedTableauCards':               1,
+#            'obviousUnstacked':                 0,
+#            'cardsInBay':                       1,
+#            'buriedTableauCards':               1,
             'depthBuriedTableauCards':          0.5,
-            'depthLowestRank':                  1,
-            'stackCardsAheadOfNeighborSuit':    1,
-            'bayCardsThatCouldBeTableau':       1,
-            'nonEmptyTableaus':                 1,
+#            'depthLowestRank':                  1,
+#            'stackCardsAheadOfNeighborSuit':    1,
+#            'bayCardsThatCouldBeTableau':       1,
+#            'nonEmptyTableaus':                 1,
         }
         ''' Good weights:
         9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
@@ -537,7 +551,7 @@ if __name__ == '__main__':
             ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_''')
-        problem = Freecell(initial=testState)
+        problem = Freecell(initial=testState, debug=True)
         print("----------------")
         solution = search.best_first_graph_search(problem, heuristic, debug=True)
     if False:
@@ -584,9 +598,5 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             print(str(problem))
             raise
-
-
-
-
 
 
