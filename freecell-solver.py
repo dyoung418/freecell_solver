@@ -230,6 +230,21 @@ class FreecellState(object):
                 result[i] = stackCol[-1][SUIT]
         return result
 
+    def getNextXStackCardsNeededPerSuit(self, x=3):
+        '''return a dict of cards representing the next X cards needed on each of
+        the stacks.  So with 4 suits, if X is 3, this will be 12 cards maximum.'''
+        result = {}
+        for i, stackCol in enumerate(self.stacks):
+            if len(stackCol) > 0:
+                stacktop = stackCol[-1]
+                r, s = tuple(stacktop)
+                # add cards in order from top stack card to topcard+x
+                for count, index in enumerate(range(ranks.index(stacktop[RANK])+1, len(ranks))):
+                    if count >= x: return result
+                    result[ranks[index]+s] = 1
+        return result
+
+
     def validSpot(self, location, card):
         '''return True or False depending on whether location is
         a valid spot for card.
@@ -334,7 +349,7 @@ class Freecell(search.Problem):
                     #if state.validSpot(otherLoc, card):
                     if state.validSpot(otherLoc, state.getCard(loc)):
                         result.append(loc+':'+otherLoc)
-        print('debug: actions: {}'.format(result))
+        #print('debug: actions: {}'.format(result))
         self.lastActions = result
         self.lastState = state
         return result
@@ -359,6 +374,7 @@ class Freecell(search.Problem):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
 def cardsNotOnStacks(node):
+    #import pdb; pdb.set_trace()
     return numCards - sum([len(s) for s in node.state.stacks])
 
 def obviousUnstacked(node):
@@ -369,6 +385,7 @@ def obviousUnstacked(node):
     A King covering an Ace is moved to the bay.  That move
     *increases* the heuristic (which needs to be minimized) because
     now the Ace is an obviousUnstacked'''
+    #import pdb; pdb.set_trace()
     r = 0
     edges = node.state.getRowX(node.state.tableau, -1)
     for card in edges:
@@ -381,9 +398,11 @@ def obviousUnstacked(node):
     return r
 
 def cardsInBay(node):
+    #import pdb; pdb.set_trace()
     return sum([len(b) for b in node.state.bays])
 
 def bayCardsThatCouldBeTableau(node):
+    #import pdb; pdb.set_trace()
     r = 0
     for b in node.state.bays:
         if len(b) > 0:
@@ -397,33 +416,77 @@ def bayCardsThatCouldBeTableau(node):
 def buriedTableauCards(node):
     '''Count of cards in the tableau which have a higher rank card
     on top of them'''
-    rankWeights = [w for w in range(len(ranks), -1, -1)]
+    #import pdb; pdb.set_trace()
     buried_tableau_cards = 0
     for tCol in node.state.tableau:
-        for i, bottomcard in enumerate(tCol):
-            bottomcardrank = ranks.index(bottomcard[RANK])
-            for j, topcard in enumerate(tCol[i+1:]):
-                if bottomcardrank <= ranks.index(topcard[RANK]):
-                    #buried_tableau_cards += 1 * rankWeights[bottomcardrank]
+        for i, buriedcard in enumerate(tCol):
+            buriedcardrank = ranks.index(buriedcard[RANK])
+            for j, highercard in enumerate(tCol[i+1:]):
+                if buriedcardrank <= ranks.index(highercard[RANK]):
                     buried_tableau_cards += 1
                     break
     return buried_tableau_cards
 
+def buriedSelectCards(node):
+    '''Count of a select set of cards in the tableau which have a higher rank card
+    on top of them.  In this case the select set are the 3 next cards needed on
+    the stack (so if the stack already has up to 3H, the select set for hearts would
+    be [4H, 5H, 6H]'''
+    #import pdb; pdb.set_trace()
+    selectCards = node.state.getNextXStackCardsNeededPerSuit(x=3)
+    buried_select_tableau_cards = 0
+    for tCol in node.state.tableau:
+        for i, buriedcard in enumerate(tCol):
+            if buriedcard in selectCards:
+                buriedcardrank = ranks.index(buriedcard[RANK])
+                for j, highercard in enumerate(tCol[i+1:]):
+                    if buriedcardrank <= ranks.index(highercard[RANK]):
+                        buried_select_tableau_cards += 1
+                        break
+    #print('selectCards: {}, val: {}'.format(selectCards, buried_select_tableau_cards)) #debug
+    return buried_select_tableau_cards
+
+def depthBuriedSelectCards(node):
+    '''Weighted Count of a select set of cards in the tableau which have a higher rank card
+    on top of them (weighted by how far it is burried).  In this case the select set are 
+    the 3 next cards needed on the stack (so if the stack already has up to 3H, the 
+    select set for hearts would be [4H, 5H, 6H]'''
+    #import pdb; pdb.set_trace()
+    selectCards = node.state.getNextXStackCardsNeededPerSuit(x=3)
+    buried_select_tableau_cards = 0
+    for tCol in node.state.tableau:
+        for i, buriedcard in enumerate(tCol):
+            if buriedcard in selectCards:
+                buriedcardrank = ranks.index(buriedcard[RANK])
+                for j, highercard in enumerate(tCol[i+1:]):
+                    if buriedcardrank <= ranks.index(highercard[RANK]):
+                        buried_select_tableau_cards += len(tCol) - i
+                        #print('tCol:{}, buriedcard:{}, val:{}'.format(tCol, buriedcard, len(tCol)-i))
+                        break
+    #print('selectCards: {}, val: {}'.format(selectCards, buried_select_tableau_cards)) #debug
+    return buried_select_tableau_cards
+
 def depthBuriedTableauCards(node):
-    rankWeights = [w for w in range(len(ranks)-1, -1, -1)]
+    '''Weighted count of cards in the tableau which have a higher rank
+    card on top of them'''
+    #import pdb; pdb.set_trace()
+    rankWeights = [w for w in range(len(ranks)-1, -1, -1)] # 12, 11, 10, ...
     depth_buried_tableau_cards = 0
     for tCol in node.state.tableau:
         for i, bottomcard in enumerate(tCol):
             bottomcardrank = ranks.index(bottomcard[RANK])
-            for j, topcard in enumerate(tCol[i+1:]):
-                if bottomcardrank < ranks.index(topcard[RANK]):
-                    depth_buried_tableau_cards += (len(tCol) - (i+j)) * rankWeights[bottomcardrank]
+            for j, highercard in enumerate(tCol[i+1:]):
+                if bottomcardrank < ranks.index(highercard[RANK]):
+                    # weight by how far it is buried and the rank of the card
+                    #depth_buried_tableau_cards += (len(tCol) - (i+j)) * rankWeights[bottomcardrank]
+                    depth_buried_tableau_cards += (len(tCol) - i) * rankWeights[bottomcardrank]
                     break
     return depth_buried_tableau_cards
 
 def depthLowestRank(node):
     '''The depth in the tableau of the lowest un-stacked rank
     of each suit added together'''
+    #import pdb; pdb.set_trace()
     r = 0
     suitNextStackRank = {'H':0, 'C':0, 'D':0, 'S':0}
     for i, s in enumerate(node.state.stacks):
@@ -443,6 +506,7 @@ def stackCardsAheadOfNeighborSuit(node):
     are no cards for the black 3's to be placed on in the 
     tableaus (black 2s are OK since black Aces are already
     in the stacks)'''
+    #import pdb; pdb.set_trace()
     suitNextStackRank = {'H':0, 'C':0, 'D':0, 'S':0}
     for i, s in enumerate(node.state.stacks):
         if len(s) > 0:
@@ -452,12 +516,15 @@ def stackCardsAheadOfNeighborSuit(node):
     return abs(redMin - blackMin)
 
 def nonEmptyTableaus(node):
+    #import pdb; pdb.set_trace()
     return sum([1 for t in node.state.tableau if len(t)>0])
 
 heuristics = {
             'cardsNotOnStacks':{'max':numCards, 'function':cardsNotOnStacks},
             'cardsInBay':{'max':4, 'function':cardsInBay},
             'buriedTableauCards':{'max':numCards - tableauCols, 'function':buriedTableauCards},
+            'buriedSelectCards':{'max':3*4, 'function':buriedSelectCards},
+            'depthBuriedSelectCards':{'max':3*4*maxTableauRows, 'function':depthBuriedSelectCards},
             'depthBuriedTableauCards':{'max': sum([r * rr for r in range(len(ranks)-1) 
                                                       for rr in range(len(ranks)-1, -1, -1)]),
                                           'function':depthBuriedTableauCards},
@@ -473,9 +540,11 @@ def heuristic(node, w=None):
         w = {
             'cardsNotOnStacks':                 9,
 #            'obviousUnstacked':                 0,
-#            'cardsInBay':                       1,
+            'cardsInBay':                       0.2,
 #            'buriedTableauCards':               1,
-            'depthBuriedTableauCards':          0.5,
+#            'buriedSelectCards':               1,
+            'depthBuriedSelectCards':               2,
+#            'depthBuriedTableauCards':          0.5,
 #            'depthLowestRank':                  1,
 #            'stackCardsAheadOfNeighborSuit':    1,
 #            'bayCardsThatCouldBeTableau':       1,
@@ -564,6 +633,7 @@ if __name__ == '__main__':
     if False:
         prob2659 = Freecell(None, seed=2659)
         prob2659.initial.printState(unicode=False)
+        state = prob2659.initial
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
         for action in ['t0:s0', 't5:s1', 't6:b0', 't7:t6', 't2:t7', 
                         't3:b1', 't3:b2', 't3:b3']:
@@ -580,7 +650,7 @@ if __name__ == '__main__':
             print(problem)
             print('Starting...')
             t0 = time.clock()
-            solution = search.best_first_graph_search(problem, heuristic, debug=False)
+            solution = search.best_first_graph_search(problem, heuristic, debug=True)
             t1 = time.clock()
             print('Deal {} ({} sec): Solution path is: {}'.format(5152, t1-t0, solution.solution()))
         except KeyboardInterrupt:
