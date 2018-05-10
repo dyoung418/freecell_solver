@@ -91,7 +91,6 @@ class FreecellState(object):
                 self.cardLocations[stack[j]] = "s"+str(i);
         for i, tableau in enumerate(self.tableau):
             for j in range(len(tableau)):
-                #self.cardLocations[tableau[j]] = "t"+str(i)+":"+str(j)
                 self.cardLocations[tableau[j]] = "t"+str(i)
         #print(self.cardLocations) # debug
 
@@ -195,7 +194,7 @@ class FreecellState(object):
             dest_areaCode, dest_index = tuple(destination)
             dest_index = int(dest_index)
             self.getArea(destination)[dest_index].append(card)
-            # update card locations  DAY TODO -  update depth info on tableau cards
+            # update card locations
             self.cardLocations[card] = destination
         else:
             raise RuntimeError
@@ -642,21 +641,22 @@ if __name__ == '__main__':
             state.printState(unicode=True)
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
 
-    if False:
+    if True:
         try:
-            prob2659 = Freecell(None, seed=2659)
-            prob5152 = Freecell(None, seed=5152)
-            problem = prob5152
+            #seed = 2659
+            #seed = 5152 #tough
+            seed = 2483 #interesting test case
+            problem = Freecell(None, seed=seed)
             print(problem)
             print('Starting...')
             t0 = time.clock()
             solution = search.best_first_graph_search(problem, heuristic, debug=True)
             t1 = time.clock()
-            print('Deal {} ({} sec): Solution path is: {}'.format(5152, t1-t0, solution.solution()))
+            print('Deal {} ({} sec): Solution path is: {}'.format(seed, t1-t0, solution.solution()))
         except KeyboardInterrupt:
             import pdb; pdb.set_trace()
             print(str(problem))
-            raise
+            #raise
     if False:
         try:
             for i in range(20):
