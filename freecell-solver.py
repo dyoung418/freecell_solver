@@ -26,7 +26,93 @@ allCardsInPriority = [r+s for r in ranks for s in suits]
 #    instead of orgin:destination.  (e.g. "t1:b0:9H" instead of "t1:b0").  Then you can have a 
 #    heuristic that favors nodes whose action acts on priority cards (Nodes include the state and
 #    the action that gets to that state and other things)
+# 3. Big error.  In second shortcut test, 5th move moves a tableau card that had already been
+#    put on stack and buried in previous moves.
 
+
+########################################################################################
+######  UTIL ROUTINES ##################################################################
+########################################################################################
+
+def timedcall(fn, *args):
+    "Call function with args; return the time in seconds and result."
+    t0 = time.clock()
+    result = fn(*args)
+    t1 = time.clock()
+    return t1-t0, result
+
+def average(numbers):
+    "Return the average (arithmetic mean) of a sequence of numbers."
+    return sum(numbers) / float(len(numbers))
+
+def timedcalls(n, fn, *args):
+    """Call fn(*args) repeatedly: n times if n is an int, or up to
+    n seconds if n is a float; return the min, avg, and max time"""
+    if isinstance(n, int):
+        times = [timedcall(fn, *args)[0] for _ in range(n)]
+    else:
+        times = []
+        total = 0.0
+        while total < n:
+            t = timedcall(fn, *args)[0]
+            total += t
+            times.append(t)
+    return min(times), average(times), max(times)
+
+
+def decorator(d):
+    """Make function d a decorator: d wraps a function fn.
+    Note that update_wrapper just makes sure the docstring and args list
+    in help(fn) point to the right place"""
+    def _d(fn):
+        return functools.update_wrapper(d(fn), fn)
+    functools.update_wrapper(_d, d)
+    return _d
+
+@decorator
+def memo(f):
+    """Decorator that caches the return value for each call to f(args).
+    Then when called again with same args, we can just look it up."""
+    cache = {}
+    def _f(*args):
+        try:
+            return cache[args]
+        except KeyError:
+            cache[args] = result = f(*args)
+            return result
+        except TypeError:
+            # some element of args can't be a dict key
+            print("debug: wasn't able to memoize") #debug
+            return f(args)
+    return _f
+
+@decorator
+def trace(f):
+    '''A decorator which prints a debugging trace every time the
+    decorated function is called.  It handles recursion with
+    indented print statements'''
+    indent = '   '
+    def _f(*args):
+        signature = '{0}({1})'.format(f.__name__, ', '.join(map(repr, args)))
+        print('{0}--> {1}'.format(trace.level*indent, signature))
+        trace.level += 1
+        try:
+            result = f(*args)
+            print('{0}<-- {1} == {2}'.format((trace.level-1)*indent, 
+                                      signature, result))
+        finally:
+            trace.level -= 1
+        return f(*args)
+    trace.level = 0
+    return _f
+
+def disabled(f): return f
+#trace = disabled
+
+
+########################################################################################
+######  FREECELL STATE  ################################################################
+########################################################################################
 
 class FreecellState(object):
     def __init__(self, tableau=None, dealSeed=None, 
@@ -89,6 +175,9 @@ class FreecellState(object):
         stacks = ','.join(self.getRowX(self.stacks, -1))
         tableau = ';'.join( [','.join(self.getRowX(self.tableau, r)) for r in range(maxTableauRows)])
         return 'FreecellState(shorthand="' + bays + ':' + stacks + ':' + tableau + '")'
+    
+    def __str__(self):
+        return self.__repr__()
 
     def __eq__(self, other):
         if repr(self) == repr(other):
@@ -211,6 +300,7 @@ class FreecellState(object):
         self.printState(file=stringOutput)
         return stringOutput.getvalue()
 
+    @trace
     def takeAction(self, action):
         '''Modify this state object with the results of taking the 
         input 'action'.'''
@@ -218,12 +308,14 @@ class FreecellState(object):
         origin_areaCode, origin_index = tuple(origin)
         origin_index = int(origin_index)
         card = self.getArea(origin)[origin_index].pop()
+        # TODO do we need the validSpot check here?  Can we just put in an assertion instead?
         if self.validSpot(destination, card):
             dest_areaCode, dest_index = tuple(destination)
             dest_index = int(dest_index)
             self.getArea(destination)[dest_index].append(card)
             # update card locations
             self.cardLocations[card] = destination
+            return self # debug: not used in calling function, but helps @trace
         else:
             raise RuntimeError
 
@@ -371,8 +463,11 @@ class Freecell(search.Problem):
             #    if row < len(state.tableau[int(loc[1])]) -1: continue # can't move tableau card unless at bottom of column
             for otherLoc in state.everyLocation:
                 if loc != otherLoc:
+                    # next 3: don't move from empty spot to empty spot
                     if (loc[0]=='b') and (otherLoc[0]=='b'): continue
                     if (loc[0]=='s') and (otherLoc[0]=='s'): continue
+                    if ((loc[0]=='t') and (len(state.tableau[int(loc[1])])==1) 
+                            and (otherLoc[0]=='t') and (len(state.tableau[int(otherLoc[1])])==0)): continue
                     #if state.validSpot(otherLoc, card):
                     if state.validSpot(otherLoc, state.getCard(loc)):
                         result.append(loc+':'+otherLoc)
@@ -381,6 +476,7 @@ class Freecell(search.Problem):
         self.lastState = state
         return result
 
+    @trace
     def result(self, state, action):
         """Return the state that results from executing the given
         action in the given state. The action must be one of
@@ -400,10 +496,31 @@ class Freecell(search.Problem):
     def __str__(self):
         return '\nstate: \n{}\nactions: \n{}'.format(str(self.lastState), str(self.lastActions))
 
+
+    def __repr__(self):
+        return 'FreeCell()' #TODO not particularly helpful, but makes @trace work better
+
+
+########################################################################################
+######  HEURISTIC ROUTINES #############################################################
+########################################################################################
+
+@memo
 def cardsNotOnStacks(node):
     #import pdb; pdb.set_trace()
     return numCards - sum([len(s) for s in node.state.stacks])
 
+@memo
+def nonstackCardsNotInTableauRuns(node):
+    '''A "tableau run" is a set of red/black descending cards at
+    the bottom of a tableau (i.e. cards "stacked" in a valid way
+    at the bottom of the tableau).  Count these and then subtract
+    from the non-stack card count.  This is to encourage stacking
+    cards rather than putting them on a blank tableau, for example.'''
+    #import pdb; pdb.set_trace()
+    raise NotImplementedError
+
+@memo
 def obviousUnstacked(node):
     '''Count of cards in the tableau that could be placed on
     the stack right now.
@@ -424,10 +541,12 @@ def obviousUnstacked(node):
            r += 1
     return r
 
+@memo
 def cardsInBay(node):
     #import pdb; pdb.set_trace()
     return sum([len(b) for b in node.state.bays])
 
+@memo
 def bayCardsThatCouldBeTableau(node):
     #import pdb; pdb.set_trace()
     r = 0
@@ -440,6 +559,7 @@ def bayCardsThatCouldBeTableau(node):
                         break
     return r
 
+@memo
 def buriedTableauCards(node):
     '''Count of cards in the tableau which have a higher rank card
     on top of them'''
@@ -454,6 +574,7 @@ def buriedTableauCards(node):
                     break
     return buried_tableau_cards
 
+@memo
 def buriedSelectCards(node):
     '''Count of a select set of cards in the tableau which have a higher rank card
     on top of them.  In this case the select set are the 3 next cards needed on
@@ -473,6 +594,7 @@ def buriedSelectCards(node):
     #print('selectCards: {}, val: {}'.format(selectCards, buried_select_tableau_cards)) #debug
     return buried_select_tableau_cards
 
+@memo
 def depthBuriedSelectCards(node):
     '''Weighted Count of a select set of cards in the tableau which have a higher rank card
     on top of them (weighted by how far it is burried).  In this case the select set are 
@@ -493,6 +615,7 @@ def depthBuriedSelectCards(node):
     #print('selectCards: {}, val: {}'.format(selectCards, buried_select_tableau_cards)) #debug
     return buried_select_tableau_cards
 
+@memo
 def depthBuriedTableauCards(node):
     '''Weighted count of cards in the tableau which have a higher rank
     card on top of them'''
@@ -510,6 +633,7 @@ def depthBuriedTableauCards(node):
                     break
     return depth_buried_tableau_cards
 
+@memo
 def depthLowestRank(node):
     '''The depth in the tableau of the lowest un-stacked rank
     of each suit added together'''
@@ -526,6 +650,7 @@ def depthLowestRank(node):
                 r += len(t) - ic -1 
     return r
 
+@memo
 def stackCardsAheadOfNeighborSuit(node):
     '''Stack cards that have run ahead of neighbor suits.
     For example, if both red stacks are at 4 (4H and 4D)
@@ -542,6 +667,7 @@ def stackCardsAheadOfNeighborSuit(node):
     redMin = min(suitNextStackRank['H'], suitNextStackRank['D'])
     return abs(redMin - blackMin)
 
+@memo
 def nonEmptyTableaus(node):
     #import pdb; pdb.set_trace()
     return sum([1 for t in node.state.tableau if len(t)>0])
@@ -549,6 +675,7 @@ def nonEmptyTableaus(node):
 heuristics = {
             'cardsNotOnStacks':{'max':numCards, 'function':cardsNotOnStacks},
             'cardsInBay':{'max':4, 'function':cardsInBay},
+            'nonstackCardsNotInTableauRuns':{'max':numCards, 'function':nonstackCardsNotInTableauRuns},
             'buriedTableauCards':{'max':numCards - tableauCols, 'function':buriedTableauCards},
             'buriedSelectCards':{'max':3*4, 'function':buriedSelectCards},
             'depthBuriedSelectCards':{'max':3*4*maxTableauRows, 'function':depthBuriedSelectCards},
@@ -568,6 +695,7 @@ def heuristic(node, w=None):
             'cardsNotOnStacks':                 9,
 #            'obviousUnstacked':                 0,
             'cardsInBay':                       0.2,
+#           'nonstackCardsNotInTableauRuns':    2,
 #            'buriedTableauCards':               1,
 #            'buriedSelectCards':               1,
             'depthBuriedSelectCards':               2,
@@ -575,7 +703,7 @@ def heuristic(node, w=None):
 #            'depthLowestRank':                  1,
 #            'stackCardsAheadOfNeighborSuit':    1,
 #            'bayCardsThatCouldBeTableau':       1,
-#            'nonEmptyTableaus':                 1,
+            'nonEmptyTableaus':                 0.1,
         }
         ''' Good weights:
         9, 0, 1, 0, 0.5, 0, 0, 0, 0, 0'''
@@ -588,30 +716,6 @@ def heuristic(node, w=None):
     #print(node.state) # debug
     return sum([w[i] * val[i]/heuristics[i]['max'] for i in val.keys()])
 
-def timedcall(fn, *args):
-    "Call function with args; return the time in seconds and result."
-    t0 = time.clock()
-    result = fn(*args)
-    t1 = time.clock()
-    return t1-t0, result
-
-def average(numbers):
-    "Return the average (arithmetic mean) of a sequence of numbers."
-    return sum(numbers) / float(len(numbers))
-
-def timedcalls(n, fn, *args):
-    """Call fn(*args) repeatedly: n times if n is an int, or up to
-    n seconds if n is a float; return the min, avg, and max time"""
-    if isinstance(n, int):
-        times = [timedcall(fn, *args)[0] for _ in range(n)]
-    else:
-        times = []
-        total = 0.0
-        while total < n:
-            t = timedcall(fn, *args)[0]
-            total += t
-            times.append(t)
-    return min(times), average(times), max(times)
 
 
 if __name__ == '__main__':
