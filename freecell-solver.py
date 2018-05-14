@@ -57,6 +57,7 @@ class FreecellState(object):
             # for i, val in enumerate(t2.split(',')):
             #     if val != '_':
             #         self.tableau[i%tableauCols].append(val)
+            self.__checkValidState()
         else:
             if tableau:
                 self.tableau = copy.deepcopy(tableau)
@@ -82,18 +83,6 @@ class FreecellState(object):
         self.everyLocation += ['t'+str(t) for t in range(tableauCols)] # Tableaus
         self.__initializeCardLocations()
 
-    def __initializeCardLocations(self):
-        for i, bay in enumerate(self.bays):
-            if len(bay) > 0:
-                self.cardLocations[bay[0]] = "b"+str(i);
-        for i, stack in enumerate(self.stacks):
-            for j in range(len(stack)):
-                self.cardLocations[stack[j]] = "s"+str(i);
-        for i, tableau in enumerate(self.tableau):
-            for j in range(len(tableau)):
-                self.cardLocations[tableau[j]] = "t"+str(i)
-        #print(self.cardLocations) # debug
-
     def __repr__(self):
         '''Shorthand notation for the state -- should be code executable'''
         bays = ','.join(self.getRowX(self.bays, 0))
@@ -109,6 +98,45 @@ class FreecellState(object):
 
     def __hash__(self):
         return hash(repr(self))
+
+    def __initializeCardLocations(self):
+        for i, bay in enumerate(self.bays):
+            if len(bay) > 0:
+                self.cardLocations[bay[0]] = "b"+str(i);
+        for i, stack in enumerate(self.stacks):
+            for j in range(len(stack)):
+                self.cardLocations[stack[j]] = "s"+str(i);
+        for i, tableau in enumerate(self.tableau):
+            for j in range(len(tableau)):
+                self.cardLocations[tableau[j]] = "t"+str(i)
+        #print(self.cardLocations) # debug
+
+    def __checkValidState(self):
+        '''Returns True if the freecell state is valid, otherwise, raises exception'''
+        cardCount = {}
+        for card in allCardsInPriority:
+            cardCount[card] = 0
+        for i, bay in enumerate(self.bays):
+            if len(bay) > 0:
+                cardCount[bay[0]] += 1
+                #print('{}, '.format(bay[0], end='')) #debug
+        for i, stack in enumerate(self.stacks):
+            if len(stack) > 0:
+                stack_rank, suit = stack[-1]
+                for rank in range(0, ranks.index(stack_rank)+1):
+                    cardCount[ranks[rank] + suit] += 1
+                    #print('{}, '.format(ranks[rank] + suit), end='') #debug
+        for i, tableau in enumerate(self.tableau):
+            for j in range(len(tableau)):
+                cardCount[tableau[j]] += 1
+                #print('{}, '.format(tableau[j]), end='') #debug
+        for card in allCardsInPriority:
+            if cardCount[card] != 1:
+                print('')
+                self.printState()
+                raise ValueError('Freecell state invalid: expected 1 instance of card "{}" but found {}'.format(card, cardCount[card]))
+        return True
+
 
     def getRowX(self, listOfLists, x):
         '''gets the xth row of a list of Lists where each inner
@@ -605,7 +633,7 @@ if __name__ == '__main__':
         print(repr(freecellGoal))
         print('freecell goal =')
         print(eval(repr(freecellGoal)))
-    if True:
+    if False:
         # This is a good thing to run if you are coming back after a long period away
         testState = FreecellState(shorthand='''JS,_,_,_:QH,KC,KD,9S:
              _,TS,_,_,_,KS,_,_
@@ -613,6 +641,22 @@ if __name__ == '__main__':
             ;_,QS,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_
+            ;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_;_,_,_,_,_,_,_,_''')
+        problem = Freecell(initial=testState, debug=True)
+        print("----------------")
+        solution = search.best_first_graph_search(problem, heuristic, debug=True)
+    if True:
+        testState = FreecellState(shorthand='''JS,_,_,_:9H,9C,KD,5S:
+             QH,6S,QC,KC,TH,TS,JC,_
+            ;_,KH,_,_,JH,KS,TC,_
+            ;_,QS,_,_,_,_,9S,_
+            ;_,8S,_,_,_,_,_,_
+            ;_,7S,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_
             ;_,_,_,_,_,_,_,_
@@ -641,7 +685,7 @@ if __name__ == '__main__':
             state.printState(unicode=True)
         print('Actions on this problem: {}'.format(prob2659.actions(state)))
 
-    if True:
+    if False:
         try:
             #seed = 2659
             #seed = 5152 #tough
